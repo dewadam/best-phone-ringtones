@@ -15,6 +15,9 @@ GENERIC_TAGS = [
 ]
 
 def slug_hashtag(value: str) -> str:
+    # Preserve the conventional brand casing for this core SEO tag.
+    if value.casefold() == "iphoneringtone":
+        return "iPhoneRingtone"
     value = unicodedata.normalize("NFKD", value)
     value = "".join(ch for ch in value if not unicodedata.combining(ch))
     words = re.findall(r"[A-Za-z0-9]+", value)
