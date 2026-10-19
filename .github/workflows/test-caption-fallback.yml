@@ -40,6 +40,10 @@ jobs:
           assert "Short approved excerpt" in with_excerpt
           print("PASS: optional approved excerpt can still be supplied explicitly.")
           PY
+      - name: Install FFmpeg for rendering test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
       - name: Test 9:16 video rendering with dynamic track overlay
         run: |
           python - <<'PY'
