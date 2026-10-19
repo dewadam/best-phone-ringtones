@@ -10,7 +10,7 @@ import html
 import re
 import sys
 import time
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -103,6 +103,10 @@ def find_lyrics_excerpt(title: str, artist: str) -> dict[str, str]:
     links = []
     for anchor in soup.select("a.result__a, a[href]"):
         href = anchor.get("href", "").strip()
+        parsed = urlparse(href)
+        if parsed.hostname and parsed.hostname.endswith("duckduckgo.com"):
+            target = parse_qs(parsed.query).get("uddg", [""])[0]
+            href = unquote(target) if target else ""
         if _allowed_url(href) and href not in links:
             links.append(href)
     if not links:
