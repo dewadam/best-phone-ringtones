@@ -47,7 +47,11 @@ jobs:
       - name: Build emoji caption and SEO hashtags
         run: |
           if [ -n "$SONG_TITLE" ] && [ -n "$ARTIST_NAME" ]; then
-            python src/build_caption.py >> "$GITHUB_ENV"
+            {
+              echo "REEL_CAPTION<<CAPTION_EOF"
+              python src/build_caption.py
+              echo "CAPTION_EOF"
+            } >> "$GITHUB_ENV"
           else
             echo "SONG_TITLE and ARTIST_NAME are not configured; using REEL_CAPTION fallback."
           fi
