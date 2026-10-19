@@ -1,64 +1,43 @@
 # Best Phone Ringtones
 
-GitHub Actions automation scaffold for producing branded vertical Reels for the **Best Phone Ringtones** account.
+GitHub Actions Reel builder for the **Best Phone Ringtones** Instagram page.
 
-## What is implemented
+## Scope
 
-- Scheduled/manual GitHub Actions workflow.
-- Neon/cyberpunk 1080×1920 visual with dynamic title/artist overlay.
-- Caption and SEO hashtag generation, with lyrics optional.
-- MP4 artifact retained for 7 days.
-- Optional Azure Blob Storage upload that creates a read-only, time-limited SAS URL for Meta to fetch the video.
-- Instagram publishing step guarded by explicit configuration; it is **not live-verified**.
+This repository currently builds a vertical Reel visual and saves it as a downloadable GitHub Actions artifact. Instagram API integration is intentionally the only major remaining stage.
 
-## Important audio limitation
+- Fixed 9:16 layout at 1080×1920, 30 FPS.
+- Displays the selected song title and artist on the visual.
+- Uses `assets/template-9x16.png` as the background when that file exists; otherwise the renderer generates its built-in neon background.
+- Builds an original caption and relevant hashtags.
+- Validates the rendered MP4 and retains the artifact for 7 days.
+- No Azure dependency, cloud storage uploader, API token, or Instagram publish call is included in this stage.
 
-Meta's Audio API lookup in this repository is used for audio metadata discovery only. It does not download a music track or place the track's actual sound into the MP4. The current renderer creates a silent visual. Do **not** enable Instagram publishing for a real ringtone/music post until a licensed audio asset and a verified audio-mux step are configured. The Instagram publishing endpoint's standard Reels flow uses a publicly fetchable video URL; don't assume the audio metadata ID can be passed as a substitute for an actual audio track.
+## Run a Reel build
 
-Use music you own or have permission to use. Do not scrape or redistribute copyrighted recordings or lyrics without permission.
+Open **Actions → Best Phone Ringtones Reel Builder → Run workflow** and provide:
+- `song_title`: song title to display.
+- `artist_name`: artist to display.
+- `duration`: 3–90 seconds (default 15).
 
-## Azure setup
+The daily schedule creates a default sample artifact. A manually dispatched run can use the chosen track details.
 
-In repository **Settings → Secrets and variables → Actions**, add:
+## Instagram music and publishing: next stage
 
-### Secret
-- `AZURE_STORAGE_CONNECTION_STRING`: connection string for a storage account you control. Keep it in GitHub Secrets; never commit it.
+The current MP4 is a silent visual. Song title/artist text is only metadata shown on the image; it does not select or attach the corresponding Instagram catalog track.
 
-### Variable
-- `AZURE_STORAGE_CONTAINER`: existing blob container name. The uploader creates a short-lived, read-only SAS URL (default 48 hours) for the uploaded MP4. The account must permit the selected SAS authentication method. Azure SDK docs: [Get started with Azure Blob Storage and Python](https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-python-get-started).
+The next integration must use Meta's currently authorized Instagram publishing/audio flow to:
+1. Search/select the exact catalog audio track by title and artist (where the connected account and API permissions support it).
+2. Create the Reel using the existing visual and selected catalog audio.
+3. Publish it and verify the resulting media status.
 
-### Instagram configuration
-Secrets:
-- `IG_USER_ID`: Instagram professional account ID.
-- `IG_ACCESS_TOKEN`: access token with the required publishing permissions.
+Do not assume a generic `audio_id` parameter is supported just because an audio lookup endpoint returns an ID. Verify the current official Meta API flow and account eligibility before wiring publishing. Until that integration is implemented and tested, this workflow does not publish to Instagram.
 
-Variables:
-- `META_GRAPH_VERSION`: currently supported Graph API version for your Meta app.
-- `META_AUDIO_TYPE`: optional; `music` (default) or `original_sound`.
-- `DRY_RUN`: leave `true` until production checks are complete.
-- `ENABLE_INSTAGRAM_PUBLISH`: leave `false` until the real audio path, account permissions, public video URL and test publish are verified.
+## Local render
 
-Meta publishing reference: [Reels Publishing](https://www.postman.com/meta/instagram/folder/y6xustx/reels-publishing). Publishing requires an eligible professional account, the correct app/token permissions, and a video URL that Meta can fetch directly over HTTPS.
-
-## Workflow behavior
-
-1. Attempts to discover trending audio metadata through the configured Meta Audio API.
-2. Uses fallback branding if the API call fails, so visual rendering can still be tested.
-3. Builds the caption and hashtags.
-4. Renders a 15-second, 1080×1920 MP4.
-5. Uploads the MP4 as a GitHub Actions artifact.
-6. If Azure settings are present, uploads the MP4 and creates a time-limited read URL.
-7. Instagram publish is only attempted when `ENABLE_INSTAGRAM_PUBLISH=true`, `DRY_RUN=false`, Azure upload succeeds, and required Instagram settings exist. Audio is not yet production-ready, so keep this disabled.
-
-The schedule is every two hours, at minute 17. GitHub Actions schedules are not exact-time guarantees. Reduce the frequency to once per day before running a production publishing account.
-
-## Local rendering
-
-Requires Python 3.10+ and FFmpeg on PATH.
+Requires Python 3.10+ and FFmpeg.
 
 ```bash
 python -m pip install -r requirements.txt
-python src/render_reel.py --title "SONG TITLE" --artist "ARTIST NAME" --duration 15 --output output/reel.mp4
+python src/render_reel.py --title "Song Title" --artist "Artist Name" --duration 15 --output output/reel.mp4
 ```
-
-The renderer creates its own neon background if `assets/template-9x16.png` is absent. The output is currently silent and is for visual/pipeline testing only.
