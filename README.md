@@ -13,7 +13,7 @@ GitHub Actions-based Instagram Reels automation scaffold for the **Best Phone Ri
 ## Repository layout
 
 - `assets/`: add the approved vertical neon template image as `template-9x16.png`.
-- `src/render_reel.py`: creates a short vertical MP4 from the template using FFmpeg.
+- `src/render_reel.py`: creates a 1080×1920 MP4 from the vertical template, adds a neon-style track-title/artist overlay, and uses FFmpeg for subtle motion.
 - `src/instagram_publish.py`: guarded Instagram Reels publishing flow.
 - `src/audio_provider.py`: audio-provider interface and capability notes.
 - `src/build_caption.py`: emoji-styled caption and SEO hashtag builder.
@@ -59,4 +59,4 @@ python -m pip install -r requirements.txt
 python src/render_reel.py --title "SONG TITLE" --artist "ARTIST NAME" --duration 15 --output output/reel.mp4
 ```
 
-The renderer expects `assets/template-9x16.png`. Publishing is intentionally not part of this local command.
+The renderer expects `assets/template-9x16.png` unless `--template` is supplied. The generated MP4 is silent: audio selection and Instagram publishing are separate steps, and the main scheduled workflow does not yet render/host the video automatically.
