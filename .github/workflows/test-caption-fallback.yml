@@ -5,6 +5,10 @@ on:
     paths:
       - "src/build_caption.py"
       - "src/render_reel.py"
+      - "src/upload_video_azure.py"
+      - "src/instagram_publish.py"
+      - "src/audio_provider.py"
+      - "requirements.txt"
       - ".github/workflows/test-caption-fallback.yml"
       - ".github/workflows/reels.yml"
   workflow_dispatch:
@@ -23,6 +27,8 @@ jobs:
           python-version: "3.11"
       - name: Install project dependencies
         run: python -m pip install -r requirements.txt
+      - name: Compile automation scripts
+        run: python -m py_compile src/build_caption.py src/render_reel.py src/upload_video_azure.py src/instagram_publish.py src/audio_provider.py
       - name: Test caption generation without lyrics
         run: |
           python - <<'PY'
