@@ -40,9 +40,7 @@ GitHub Actions-based Instagram Reels automation scaffold for the **Best Phone Ri
 
 The caption builder creates an emoji-styled caption with the track title/artist, a short hook, and relevant hashtags such as `#iPhoneRingtone`, `#Ringtone`, `#PhoneSounds`, plus artist/track tags. Hashtags are selected from the title and artist metadata and deduplicated.
 
-**Lyrics handling:** Meta's Audio API provides audio selection/metadata, not the song's lyrics. `LYRIC_EXCERPT` remains an optional Actions variable; when you supply a short excerpt you have permission to use, the caption builder includes it. If the variable is empty, it uses an original promotional hook. The current workflow does not fetch lyrics automatically from random lyric websites.
-
-Set `LYRIC_EXCERPT` in repository Actions variables if you have an excerpt cleared for use. `SONG_TITLE` and `ARTIST_NAME` now come from Meta's selected audio response instead of being manually set for every run.
+**Lyrics handling:** Meta's Audio API provides audio selection/metadata, not lyrics. Automatic lyrics scraping is currently paused because public pages and search results were unreliable in GitHub Actions. This does not block caption generation: when `LYRIC_EXCERPT` is empty, the caption builder uses an original promotional hook. Only provide an excerpt you have permission to use. `SONG_TITLE` and `ARTIST_NAME` come from Meta's selected audio response when available. The lyrics-source probe is now manual and separate from the publishing workflow.
 
 ## Publishing safety
 
