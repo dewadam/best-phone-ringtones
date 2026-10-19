@@ -20,12 +20,10 @@ jobs:
       IG_USER_ID: ${{ secrets.IG_USER_ID }}
       IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
       META_GRAPH_VERSION: ${{ vars.META_GRAPH_VERSION }}
+      META_AUDIO_TYPE: ${{ vars.META_AUDIO_TYPE || 'music' }}
       PUBLIC_VIDEO_URL: ${{ vars.PUBLIC_VIDEO_URL }}
       DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
-      META_AUDIO_ID: ${{ vars.META_AUDIO_ID }}
       REEL_CAPTION: ${{ vars.REEL_CAPTION }}
-      SONG_TITLE: ${{ vars.SONG_TITLE }}
-      ARTIST_NAME: ${{ vars.ARTIST_NAME }}
       LYRIC_EXCERPT: ${{ vars.LYRIC_EXCERPT }}
     steps:
       - uses: actions/checkout@v4
@@ -41,10 +39,31 @@ jobs:
           python - <<'PY'
           import os
           print("DRY_RUN =", os.getenv("DRY_RUN", "true"))
-          for name in ("IG_USER_ID", "IG_ACCESS_TOKEN", "META_GRAPH_VERSION", "PUBLIC_VIDEO_URL", "META_AUDIO_ID"):
+          for name in ("IG_USER_ID", "IG_ACCESS_TOKEN", "META_GRAPH_VERSION", "PUBLIC_VIDEO_URL"):
               print(f"{name} configured =", bool(os.getenv(name)))
           PY
-      - name: Build emoji caption and SEO hashtags
+      - name: Discover trending audio from Meta
+        run: |
+          python src/audio_provider.py > selected_audio.json
+          python - <<'PY'
+          import json, os
+          with open("selected_audio.json", encoding="utf-8") as f:
+              track = json.load(f)
+          # Values are returned by Meta's API; don't accept a manually invented audio ID.
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              for key, value in (
+                  ("META_AUDIO_ID", track["audio_id"]),
+                  ("SONG_TITLE", track.get("title", "")),
+                  ("ARTIST_NAME", track.get("artist", "")),
+              ):
+                  value = str(value or "")
+                  if "\\n" in value or "\\r" in value:
+                      raise ValueError(f"Unexpected newline in Meta field: {key}")
+                  env.write(f"{key}={value}\\n")
+          print("Selected Meta audio:", track.get("title") or "(title not supplied)",
+                "—", track.get("artist") or "(artist not supplied)")
+          PY
+      - name: Build emoji caption, optional lyrics, and SEO hashtags
         run: |
           if [ -n "$SONG_TITLE" ] && [ -n "$ARTIST_NAME" ]; then
             {
@@ -53,7 +72,7 @@ jobs:
               echo "CAPTION_EOF"
             } >> "$GITHUB_ENV"
           else
-            echo "SONG_TITLE and ARTIST_NAME are not configured; using REEL_CAPTION fallback."
+            echo "Meta did not return both title and artist; using configured REEL_CAPTION fallback."
           fi
       - name: Guarded publish call
         run: python src/instagram_publish.py
