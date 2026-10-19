@@ -1,0 +1,39 @@
+name: Test Caption Fallback
+
+on:
+  push:
+    paths:
+      - "src/build_caption.py"
+      - ".github/workflows/test-caption-fallback.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-caption-fallback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test caption generation without lyrics
+        run: |
+          python - <<'PY'
+          from src.build_caption import build_caption
+
+          caption = build_caption("Blinding Lights", "The Weeknd")
+          assert "Blinding Lights" in caption
+          assert "The Weeknd" in caption
+          assert "fresh sound" in caption
+          assert "#iPhoneRingtone" in caption
+          assert "#Ringtone" in caption
+          assert len(caption) < 2200
+          print("PASS: caption works without lyrics and includes track metadata, original hook, and SEO tags.")
+
+          with_excerpt = build_caption("Blinding Lights", "The Weeknd", "Short approved excerpt")
+          assert "Short approved excerpt" in with_excerpt
+          print("PASS: optional approved excerpt can still be supplied explicitly.")
+          PY
