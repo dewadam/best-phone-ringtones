@@ -127,14 +127,30 @@ def _search_links(query: str) -> list[str]:
     return []
 
 
+def _direct_candidates(title: str, artist: str) -> list[str]:
+    """Build a few conventional AZLyrics URLs before relying on search pages."""
+    slug = lambda value: re.sub(r"[^a-z0-9]", "", value.lower())
+    title_slug = slug(title)
+    artist_slug = slug(artist)
+    artist_variants = [artist_slug]
+    if artist_slug.startswith("the") and len(artist_slug) > 3:
+        artist_variants.append(artist_slug[3:])
+    if artist_slug.endswith("the") and len(artist_slug) > 3:
+        artist_variants.append(artist_slug[:-3])
+    candidates = []
+    for artist_name in dict.fromkeys(artist_variants):
+        candidates.append(f"https://www.azlyrics.com/lyrics/{artist_name}/{title_slug}.html")
+    return candidates
+
+
 def find_lyrics_excerpt(title: str, artist: str) -> dict[str, str]:
     query = f'site:lyricstranslate.com OR site:azlyrics.com "{title}" "{artist}" lyrics'
-    links = _search_links(query)
-    if not links:
-        raise LyricsFetchError("All public search endpoints returned no allowed lyrics-page links.")
+    # Try predictable AZLyrics URLs first; search engines may serve bot-check pages in CI.
+    links = _direct_candidates(title, artist)
+    links.extend(url for url in _search_links(query) if url not in links)
 
     errors = []
-    for url in links[:5]:
+    for url in links[:8]:
         try:
             page = _get(url)
             excerpt = extract_lyrics_from_html(url, page.text)
