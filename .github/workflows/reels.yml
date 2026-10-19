@@ -34,6 +34,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
       - name: Check configuration
         run: |
           python - <<'PY'
@@ -74,5 +78,20 @@ jobs:
           else
             echo "Meta did not return both title and artist; using configured REEL_CAPTION fallback."
           fi
-      - name: Guarded publish call
-        run: python src/instagram_publish.py
+      - name: Render branded 9:16 Reel
+        run: |
+          TITLE="${SONG_TITLE:-Best Phone Ringtones}"
+          ARTIST="${ARTIST_NAME:-Trending Audio}"
+          python src/render_reel.py --title "$TITLE" --artist "$ARTIST" --duration 15 --output output/best-phone-ringtones-reel.mp4
+      - name: Upload rendered Reel as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: best-phone-ringtones-reel
+          path: output/best-phone-ringtones-reel.mp4
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publishing status
+        run: |
+          echo "Reel rendered and saved as a downloadable Actions artifact."
+          echo "Automatic Instagram publishing is intentionally paused until the generated MP4 is hosted at a public HTTPS URL."
+          echo "PUBLIC_VIDEO_URL is not used here because it could point to a stale or unrelated video."
