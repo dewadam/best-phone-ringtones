@@ -4,20 +4,25 @@ on:
   workflow_dispatch:
     inputs:
       song_title:
-        description: "Music title to show on the Reel"
+        description: "Instagram catalog song title"
         required: true
-        default: "Song Title"
+        default: "TRALALA"
         type: string
       artist_name:
-        description: "Artist name to show on the Reel"
+        description: "Artist name"
         required: true
-        default: "Artist Name"
+        default: "Manifest"
         type: string
       duration:
         description: "Reel duration in seconds (3-90)"
         required: true
-        default: "15"
+        default: "30"
         type: string
+      publish_now:
+        description: "Publish to Instagram (requires configured repository secrets)"
+        required: true
+        default: false
+        type: boolean
   schedule:
     - cron: "17 12 * * *"
 
@@ -31,7 +36,7 @@ concurrency:
 jobs:
   build-reel:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,9 +62,9 @@ jobs:
           INPUT_ARTIST: ${{ inputs.artist_name }}
           INPUT_DURATION: ${{ inputs.duration }}
         run: |
-          TITLE="${INPUT_TITLE:-Song Title}"
-          ARTIST="${INPUT_ARTIST:-Artist Name}"
-          DURATION="${INPUT_DURATION:-15}"
+          TITLE="${INPUT_TITLE:-TRALALA}"
+          ARTIST="${INPUT_ARTIST:-Manifest}"
+          DURATION="${INPUT_DURATION:-30}"
           if ! [[ "$DURATION" =~ ^[0-9]+$ ]] || [ "$DURATION" -lt 3 ] || [ "$DURATION" -gt 90 ]; then
             echo "::error::Duration must be an integer between 3 and 90 seconds."
             exit 1
@@ -80,7 +85,7 @@ jobs:
             echo "CAPTION_EOF"
           } >> "$GITHUB_ENV"
 
-      - name: Render the fixed 9:16 Reel visual
+      - name: Render Reel visual
         run: |
           mkdir -p output
           python src/render_reel.py \
@@ -98,7 +103,21 @@ jobs:
           ffprobe -v error -show_entries format=duration \
             -of default=noprint_wrappers=1 output/best-phone-ringtones-reel.mp4
 
+      - name: Publish Reel with Instagram catalog audio
+        if: ${{ inputs.publish_now == true }}
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
+          SONG_TITLE: ${{ inputs.song_title }}
+          ARTIST_NAME: ${{ inputs.artist_name }}
+          REEL_CAPTION: ${{ env.REEL_CAPTION }}
+          VIDEO_PATH: output/best-phone-ringtones-reel.mp4
+          INSTAGRAM_PUBLISH: "true"
+        run: python src/instagram_publish.py
+
       - name: Save Reel and caption as workflow artifacts
+        if: ${{ inputs.publish_now != true }}
         uses: actions/upload-artifact@v4
         with:
           name: best-phone-ringtones-reel
@@ -111,6 +130,9 @@ jobs:
       - name: Report status
         if: always()
         run: |
-          echo "Reel generation is complete when the artifact step succeeds."
-          echo "Instagram API publishing and Instagram music selection are intentionally not implemented yet."
-          echo "The MP4 is a silent visual; the Instagram integration will need to attach/select catalog audio when supported by the authorized account/API."
+          echo "Video generation completed."
+          if [ "${{ inputs.publish_now }}" = "true" ]; then
+            echo "Instagram publish was requested. Check the preceding step for API result."
+          else
+            echo "Preview-only run: no Instagram post was made."
+          fi
