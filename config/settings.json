@@ -7,12 +7,8 @@
     "default_duration_seconds": 15
   },
   "publishing": {
-    "dry_run": true,
+    "enabled": false,
     "max_posts_per_run": 1,
-    "check_quota_before_publish": true
-  },
-  "audio": {
-    "provider": "meta_authorized_api",
-    "require_api_returned_audio_id": true
+    "requires_verified_instagram_audio_api": true
   }
 }
