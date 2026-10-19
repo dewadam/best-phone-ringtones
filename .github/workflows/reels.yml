@@ -63,23 +63,7 @@ jobs:
           print("Selected Meta audio:", track.get("title") or "(title not supplied)",
                 "—", track.get("artist") or "(artist not supplied)")
           PY
-      - name: Try fetching a short lyrics excerpt from public websites
-        continue-on-error: true
-        run: |
-          if [ -n "$SONG_TITLE" ] && [ -n "$ARTIST_NAME" ]; then
-            python src/lyrics_scraper.py "$SONG_TITLE" "$ARTIST_NAME" > lyrics_excerpt.txt || true
-            if [ -s lyrics_excerpt.txt ]; then
-              {
-                echo "LYRIC_EXCERPT<<LYRICS_EOF"
-                cat lyrics_excerpt.txt
-                echo "LYRICS_EOF"
-              } >> "$GITHUB_ENV"
-              echo "A short lyrics excerpt was extracted."
-            else
-              echo "No lyrics excerpt found; the caption builder will use an original hook."
-            fi
-          fi
-      - name: Build emoji caption, optional lyrics, and SEO hashtags
+      - name: Build emoji caption and SEO hashtags (lyrics optional)
         run: |
           if [ -n "$SONG_TITLE" ] && [ -n "$ARTIST_NAME" ]; then
             {
