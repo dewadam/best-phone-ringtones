@@ -7,7 +7,7 @@ GitHub Actions-based Instagram Reels automation scaffold for the **Best Phone Ri
 - 9:16 (1080×1920) branded visual workflow.
 - Scheduled/manual GitHub Actions entry point.
 - Instagram Graph API publishing flow with an explicit dry-run safety default.
-- Audio discovery and attachment are kept behind a provider adapter: only audio actually returned and permitted by the connected Meta API integration should be used.
+- `src/audio_provider.py` requests trending audio from Meta's Instagram Audio API and selects one returned record; the workflow passes that returned audio ID and metadata to captioning/publishing.
 - Publishing remains disabled until credentials, public video hosting, account permissions, and audio API access are configured and tested.
 
 ## Repository layout
@@ -34,15 +34,15 @@ GitHub Actions-based Instagram Reels automation scaffold for the **Best Phone Ri
 - `PUBLIC_VIDEO_URL`: public HTTPS location where the rendered video can be fetched.
 - `META_GRAPH_VERSION`: Graph API version approved for your app, e.g. `vXX.X` (set a currently supported version; do not copy an obsolete example).
 
-Audio API availability may require additional app setup and permissions. Do not assume every sound shown in the Instagram mobile app is available through API. The integration should use the exact audio identifiers and parameters returned by Meta's authorized API.
+## Meta Audio API: how song selection works\n\nThe workflow calls `GET /{ig-user-id}/ig_audio?audio_type=music` using the configured Graph API version and user access token. Meta returns a list of audio records; the workflow selects one record from that response and uses its exact ID, title, and artist metadata when available. Set the optional Actions variable `META_AUDIO_TYPE` to `original_sound` to request original sounds instead of music. With no search query, Meta's documented behavior is to return trending audio. The API's eligible catalog can differ from the music picker in the Instagram app.\n\nRequirements include an Instagram Business or Creator account, a connected Facebook Page, a Facebook app using **Facebook Login**, and the `instagram_basic` and `instagram_content_publish` permissions. Meta documents that the Audio API is not supported through Instagram Login. The app/token must actually have access; this repository change does not prove that your account's credentials are configured or that a live request succeeds. See [Meta Audio API documentation](https://developers.facebook.com/docs/instagram-platform/content-publishing/audio-api).
 
 ## Reel captions: lyrics, emojis, SEO hashtags
 
 The caption builder creates an emoji-styled caption with the track title/artist, a short hook, and relevant hashtags such as `#iPhoneRingtone`, `#Ringtone`, `#PhoneSounds`, plus artist/track tags. Hashtags are selected from the title and artist metadata and deduplicated.
 
-**Lyrics handling:** do not scrape or reproduce full copyrighted lyrics. The builder accepts only a short lyric excerpt supplied by you or cleared for use; if none is supplied, it generates an original track-related hook instead.
+**Lyrics handling:** Meta's Audio API provides audio selection/metadata, not the song's lyrics. `LYRIC_EXCERPT` remains an optional Actions variable; when you supply a short excerpt you have permission to use, the caption builder includes it. If the variable is empty, it uses an original promotional hook. The current workflow does not fetch lyrics automatically from random lyric websites.
 
-Set `SONG_TITLE`, `ARTIST_NAME`, and optionally `LYRIC_EXCERPT` in repository Actions variables. Keep the excerpt short and authorized.
+Set `LYRIC_EXCERPT` in repository Actions variables if you have an excerpt cleared for use. `SONG_TITLE` and `ARTIST_NAME` now come from Meta's selected audio response instead of being manually set for every run.
 
 ## Publishing safety
 
