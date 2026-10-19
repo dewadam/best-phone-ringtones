@@ -1,10 +1,6 @@
-name: Test Lyrics Scraper
+name: Manual Lyrics Source Probe
 
 on:
-  push:
-    paths:
-      - "src/lyrics_scraper.py"
-      - ".github/workflows/test-lyrics-scraper.yml"
   workflow_dispatch:
     inputs:
       song_title:
