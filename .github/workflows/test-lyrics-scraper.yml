@@ -1,0 +1,50 @@
+name: Test Lyrics Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      song_title:
+        description: "Song title to search"
+        required: true
+        type: string
+      artist_name:
+        description: "Artist name to search"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  test-lyrics-scraper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install scraper dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests "beautifulsoup4>=4.12,<5"
+      - name: Fetch and validate a short excerpt
+        env:
+          SONG_TITLE: ${{ inputs.song_title }}
+          ARTIST_NAME: ${{ inputs.artist_name }}
+        run: |
+          set +e
+          python src/lyrics_scraper.py "$SONG_TITLE" "$ARTIST_NAME" > excerpt.txt
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] || [ ! -s excerpt.txt ]; then
+            echo "::error::No excerpt could be extracted. Check the step logs for the site's response."
+            exit 1
+          fi
+          echo "### Lyrics scraper test result" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Song: $SONG_TITLE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artist: $ARTIST_NAME" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Extracted excerpt length: $(wc -m < excerpt.txt | tr -d ' ')" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo 'The excerpt is omitted from the summary to avoid republishing lyrics in workflow logs.'
+          echo "Extraction succeeded. See step logs for source URL."
