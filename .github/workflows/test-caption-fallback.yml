@@ -6,6 +6,7 @@ on:
       - "src/build_caption.py"
       - "src/render_reel.py"
       - ".github/workflows/test-caption-fallback.yml"
+      - ".github/workflows/reels.yml"
   workflow_dispatch:
 
 permissions:
