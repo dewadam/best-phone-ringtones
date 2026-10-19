@@ -57,9 +57,9 @@ jobs:
                   ("ARTIST_NAME", track.get("artist", "")),
               ):
                   value = str(value or "")
-                  if "\\n" in value or "\\r" in value:
+                  if "\n" in value or "\r" in value:
                       raise ValueError(f"Unexpected newline in Meta field: {key}")
-                  env.write(f"{key}={value}\\n")
+                  env.write(f"{key}={value}\n")
           print("Selected Meta audio:", track.get("title") or "(title not supplied)",
                 "—", track.get("artist") or "(artist not supplied)")
           PY
