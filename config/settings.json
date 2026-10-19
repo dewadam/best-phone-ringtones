@@ -1,0 +1,18 @@
+{
+  "brand": "Best Phone Ringtones",
+  "video": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "default_duration_seconds": 15
+  },
+  "publishing": {
+    "dry_run": true,
+    "max_posts_per_run": 1,
+    "check_quota_before_publish": true
+  },
+  "audio": {
+    "provider": "meta_authorized_api",
+    "require_api_returned_audio_id": true
+  }
+}
