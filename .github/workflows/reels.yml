@@ -13,18 +13,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate-and-publish:
+  validate-render-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       IG_USER_ID: ${{ secrets.IG_USER_ID }}
       IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
       META_GRAPH_VERSION: ${{ vars.META_GRAPH_VERSION }}
       META_AUDIO_TYPE: ${{ vars.META_AUDIO_TYPE || 'music' }}
-      PUBLIC_VIDEO_URL: ${{ vars.PUBLIC_VIDEO_URL }}
       DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
       REEL_CAPTION: ${{ vars.REEL_CAPTION }}
       LYRIC_EXCERPT: ${{ vars.LYRIC_EXCERPT }}
+      AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+      AZURE_STORAGE_CONTAINER: ${{ vars.AZURE_STORAGE_CONTAINER }}
+      AZURE_SAS_HOURS: "48"
+      ENABLE_INSTAGRAM_PUBLISH: ${{ vars.ENABLE_INSTAGRAM_PUBLISH || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,22 +41,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-      - name: Check configuration
+      - name: Check configuration safely
         run: |
           python - <<'PY'
           import os
-          print("DRY_RUN =", os.getenv("DRY_RUN", "true"))
-          for name in ("IG_USER_ID", "IG_ACCESS_TOKEN", "META_GRAPH_VERSION", "PUBLIC_VIDEO_URL"):
+          for name in ("IG_USER_ID", "IG_ACCESS_TOKEN", "META_GRAPH_VERSION",
+                       "AZURE_STORAGE_CONNECTION_STRING", "AZURE_STORAGE_CONTAINER"):
               print(f"{name} configured =", bool(os.getenv(name)))
+          print("DRY_RUN =", os.getenv("DRY_RUN", "true"))
+          print("ENABLE_INSTAGRAM_PUBLISH =", os.getenv("ENABLE_INSTAGRAM_PUBLISH", "false"))
           PY
-      - name: Discover trending audio from Meta
+      - name: Discover trending audio metadata from Meta
+        id: audio
+        continue-on-error: true
         run: |
           python src/audio_provider.py > selected_audio.json
           python - <<'PY'
           import json, os
           with open("selected_audio.json", encoding="utf-8") as f:
               track = json.load(f)
-          # Values are returned by Meta's API; don't accept a manually invented audio ID.
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
               for key, value in (
                   ("META_AUDIO_ID", track["audio_id"]),
@@ -64,25 +70,30 @@ jobs:
                   if "\n" in value or "\r" in value:
                       raise ValueError(f"Unexpected newline in Meta field: {key}")
                   env.write(f"{key}={value}\n")
-          print("Selected Meta audio:", track.get("title") or "(title not supplied)",
-                "—", track.get("artist") or "(artist not supplied)")
+          print("Meta metadata selected:", track.get("title") or "Untitled",
+                "—", track.get("artist") or "Unknown artist")
           PY
-      - name: Build emoji caption and SEO hashtags (lyrics optional)
+      - name: Set safe metadata fallback if Meta audio discovery is unavailable
+        if: steps.audio.outcome != 'success'
         run: |
-          if [ -n "$SONG_TITLE" ] && [ -n "$ARTIST_NAME" ]; then
-            {
-              echo "REEL_CAPTION<<CAPTION_EOF"
+          echo "SONG_TITLE=Best Phone Ringtones" >> "$GITHUB_ENV"
+          echo "ARTIST_NAME=Trending Audio" >> "$GITHUB_ENV"
+          echo "META_AUDIO_ID=" >> "$GITHUB_ENV"
+          echo "::warning::Meta audio metadata was unavailable; rendering will continue with fallback branding."
+      - name: Build emoji caption and SEO hashtags
+        run: |
+          {
+            echo "REEL_CAPTION<<CAPTION_EOF"
+            if [ -n "$SONG_TITLE" ] && [ -n "$ARTIST_NAME" ]; then
               python src/build_caption.py
-              echo "CAPTION_EOF"
-            } >> "$GITHUB_ENV"
-          else
-            echo "Meta did not return both title and artist; using configured REEL_CAPTION fallback."
-          fi
+            else
+              printf '%s\n' "${REEL_CAPTION:-🎧 Best Phone Ringtones 🎵 Which sound fits your vibe? #iPhoneRingtone #Ringtones}"
+            fi
+            echo "CAPTION_EOF"
+          } >> "$GITHUB_ENV"
       - name: Render branded 9:16 Reel
         run: |
-          TITLE="${SONG_TITLE:-Best Phone Ringtones}"
-          ARTIST="${ARTIST_NAME:-Trending Audio}"
-          python src/render_reel.py --title "$TITLE" --artist "$ARTIST" --duration 15 --output output/best-phone-ringtones-reel.mp4
+          python src/render_reel.py --title "${SONG_TITLE:-Best Phone Ringtones}" --artist "${ARTIST_NAME:-Trending Audio}" --duration 15 --output output/best-phone-ringtones-reel.mp4
       - name: Upload rendered Reel as workflow artifact
         uses: actions/upload-artifact@v4
         with:
@@ -90,8 +101,37 @@ jobs:
           path: output/best-phone-ringtones-reel.mp4
           if-no-files-found: error
           retention-days: 7
-      - name: Publishing status
+      - name: Upload Reel to Azure Blob Storage and create temporary read URL
+        id: azure_upload
+        if: env.AZURE_STORAGE_CONNECTION_STRING != '' && env.AZURE_STORAGE_CONTAINER != ''
         run: |
-          echo "Reel rendered and saved as a downloadable Actions artifact."
-          echo "Automatic Instagram publishing is intentionally paused until the generated MP4 is hosted at a public HTTPS URL."
-          echo "PUBLIC_VIDEO_URL is not used here because it could point to a stale or unrelated video."
+          python src/upload_video_azure.py output/best-phone-ringtones-reel.mp4 > azure_upload.txt
+          cat azure_upload.txt | sed -E 's#(https://[^?]+)\?.*#Azure video URL created: \1?[REDACTED SAS]#'
+          VIDEO_URL="$(sed -n 's/^PUBLIC_VIDEO_URL=//p' azure_upload.txt)"
+          if [ -z "$VIDEO_URL" ]; then
+            echo "::error::Azure uploader did not return a video URL."
+            exit 1
+          fi
+          echo "::add-mask::$VIDEO_URL"
+          echo "PUBLIC_VIDEO_URL=$VIDEO_URL" >> "$GITHUB_ENV"
+          echo "Azure upload succeeded; the temporary URL is masked in logs."
+      - name: Explain missing Azure configuration
+        if: env.AZURE_STORAGE_CONNECTION_STRING == '' || env.AZURE_STORAGE_CONTAINER == ''
+        run: |
+          echo "::notice::Azure upload skipped. Add secret AZURE_STORAGE_CONNECTION_STRING and variable AZURE_STORAGE_CONTAINER to enable hosting."
+      - name: Publish Reel to Instagram
+        if: env.ENABLE_INSTAGRAM_PUBLISH == 'true' && env.DRY_RUN == 'false' && steps.azure_upload.outcome == 'success' && env.IG_USER_ID != '' && env.IG_ACCESS_TOKEN != '' && env.META_GRAPH_VERSION != ''
+        run: |
+          python src/instagram_publish.py
+      - name: Publishing readiness status
+        if: always()
+        run: |
+          echo "A branded 1080x1920 MP4 is produced and retained as an Actions artifact."
+          if [ "${{ steps.azure_upload.outcome }}" = "success" ]; then
+            echo "Azure Blob upload succeeded; a temporary read SAS URL was created."
+          else
+            echo "Azure hosting is not configured or upload failed; inspect earlier step logs."
+          fi
+          if [ "$ENABLE_INSTAGRAM_PUBLISH" != "true" ] || [ "$DRY_RUN" != "false" ]; then
+            echo "Instagram publishing remains guarded. Set ENABLE_INSTAGRAM_PUBLISH=true and DRY_RUN=false only after validating Meta permissions and audio workflow."
+          fi
