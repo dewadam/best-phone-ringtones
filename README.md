@@ -1,37 +1,48 @@
 # Best Phone Ringtones
 
-GitHub Actions Reel builder for the **Best Phone Ringtones** Instagram page.
+GitHub Actions Reel builder for the **Best Phone Ringtones** Instagram account.
 
-## Scope
+## Current workflow
 
-This repository currently builds a vertical Reel visual and saves it as a downloadable GitHub Actions artifact. Instagram API integration is intentionally the only major remaining stage.
+- Builds a 1080×1920, 30 FPS vertical MP4.
+- Displays the selected song title and artist.
+- Creates a caption/hashtag file.
+- Validates the MP4 with FFmpeg/ffprobe.
+- Supports preview-only builds by default.
+- Has an optional Instagram publishing step using Meta's Instagram API with Facebook Login and Audio API.
+- Contains no Azure dependency.
 
-- Fixed 9:16 layout at 1080×1920, 30 FPS.
-- Displays the selected song title and artist on the visual.
-- Uses `assets/template-9x16.png` as the background when that file exists; otherwise the renderer generates its built-in neon background.
-- Builds an original caption and relevant hashtags.
-- Validates the rendered MP4 and retains the artifact for 7 days.
-- No Azure dependency, cloud storage uploader, API token, or Instagram publish call is included in this stage.
+## Run a preview
 
-## Run a Reel build
+Open **Actions → Best Phone Ringtones Reel Builder → Run workflow**.
 
-Open **Actions → Best Phone Ringtones Reel Builder → Run workflow** and provide:
-- `song_title`: song title to display.
-- `artist_name`: artist to display.
-- `duration`: 3–90 seconds (default 15).
+Inputs:
+- `song_title`: track title (example: `TRALALA`)
+- `artist_name`: artist (example: `Manifest`)
+- `duration`: 3–90 seconds (default 30)
+- `publish_now`: leave unchecked to create a preview only; check it only after the Meta app, account, permissions and repository secrets are configured.
 
-The daily schedule creates a default sample artifact. A manually dispatched run can use the chosen track details.
+The preview MP4 is silent. It is saved as a GitHub Actions artifact when publishing is not requested.
 
-## Instagram music and publishing: next stage
+## Configure Instagram API publishing
 
-The current MP4 is a silent visual. Song title/artist text is only metadata shown on the image; it does not select or attach the corresponding Instagram catalog track.
+The publishing step is deliberately opt-in. Before using it:
 
-The next integration must use Meta's currently authorized Instagram publishing/audio flow to:
-1. Search/select the exact catalog audio track by title and artist (where the connected account and API permissions support it).
-2. Create the Reel using the existing visual and selected catalog audio.
-3. Publish it and verify the resulting media status.
+1. Use an Instagram **Business or Creator** account and connect the required Facebook Page for the Facebook Login flow.
+2. Create/configure a Meta developer app and obtain the appropriate access token and permissions for Instagram audio search and content publishing.
+3. In GitHub repository **Settings → Secrets and variables → Actions → Secrets**, add:
+   - `IG_USER_ID`: Instagram professional account ID.
+   - `IG_ACCESS_TOKEN`: valid token with the required permissions.
+4. Optionally set repository variable `META_API_VERSION` to the Graph API version enabled for your app (default in workflow: `v24.0`).
+5. Run a manual workflow with the exact song title and artist. Enable `publish_now` only when you intend to publish publicly.
 
-Do not assume a generic `audio_id` parameter is supported just because an audio lookup endpoint returns an ID. Verify the current official Meta API flow and account eligibility before wiring publishing. Until that integration is implemented and tested, this workflow does not publish to Instagram.
+The script searches Instagram's available catalog audio using the song title and artist, chooses the closest returned match, creates a resumable Reel container with the selected audio, waits for processing, then publishes. Audio catalog availability can differ from the Instagram mobile app and may be restricted by account type, region, licensing, app review, or permissions. If lookup/attachment is rejected or no usable result is returned, the workflow fails rather than intentionally publishing without the requested track.
+
+**Important:** API support and access must be validated for the specific Meta app/account. Do not paste access tokens into source code, workflow inputs, issues, or logs. Keep tokens in GitHub Actions secrets. The first live run publishes a real Reel; there is no simulated publishing mode once `publish_now` is enabled.
+
+## Template video
+
+The renderer currently uses `assets/template-9x16.png` as a still background if present, otherwise it generates a fallback background. To use the user-supplied 30-second MP4 as the actual template, commit it to the repository and update the renderer to preserve its existing animation while overlaying only the song title. The supplied MP4 has not yet been added to this repository, so the current renderer does **not** use it.
 
 ## Local render
 
@@ -39,5 +50,5 @@ Requires Python 3.10+ and FFmpeg.
 
 ```bash
 python -m pip install -r requirements.txt
-python src/render_reel.py --title "Song Title" --artist "Artist Name" --duration 15 --output output/reel.mp4
+python src/render_reel.py --title "Song Title" --artist "Artist Name" --duration 30 --output output/reel.mp4
 ```
