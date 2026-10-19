@@ -9,6 +9,7 @@ on:
       - "config/settings.json"
       - ".github/workflows/test-caption-fallback.yml"
       - ".github/workflows/reels.yml"
+      - "README.md"
   workflow_dispatch:
 
 permissions:
@@ -25,6 +26,13 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
+      - name: Verify Azure and premature API code are removed
+        run: |
+          test ! -e src/upload_video_azure.py
+          test ! -e src/audio_provider.py
+          test ! -e src/instagram_publish.py
+          ! grep -qi "azure-storage-blob\|AZURE_STORAGE" requirements.txt .github/workflows/reels.yml README.md config/settings.json
+          echo "PASS: Azure integration and unverified Instagram API stubs are absent."
       - name: Compile active Python scripts
         run: python -m py_compile src/build_caption.py src/render_reel.py
       - name: Test caption metadata and hashtags
