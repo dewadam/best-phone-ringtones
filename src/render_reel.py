@@ -40,9 +40,29 @@ def _fit_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont,
     return text
 
 
-def create_branded_frame(template: Path, title: str, artist: str, destination: Path) -> None:
-    """Crop a template to 9:16 and draw readable, dynamic title/artist metadata."""
-    with Image.open(template) as source:
+def create_default_background(destination: Path) -> None:
+    """Create a self-contained dark neon grid background when no asset is supplied."""
+    image = Image.new("RGB", (WIDTH, HEIGHT), (5, 8, 24))
+    draw = ImageDraw.Draw(image)
+    for x in range(0, WIDTH, 90):
+        draw.line((x, 0, x, HEIGHT), fill=(13, 34, 62), width=2)
+    for y in range(0, HEIGHT, 90):
+        draw.line((0, y, WIDTH, y), fill=(13, 34, 62), width=2)
+    draw.ellipse((-260, 180, 470, 910), outline=(0, 180, 220), width=8)
+    draw.ellipse((650, 600, 1300, 1250), outline=(170, 30, 145), width=8)
+    draw.ellipse((720, 120, 1120, 520), outline=(0, 100, 150), width=4)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    image.save(destination, format="PNG", optimize=True)
+
+
+def create_branded_frame(template: Path | None, title: str, artist: str, destination: Path) -> None:
+    """Crop an optional template to 9:16 and draw readable, dynamic track metadata."""
+    if template is None:
+        source_path = destination.with_name(destination.stem + ".background.png")
+        create_default_background(source_path)
+    else:
+        source_path = template
+    with Image.open(source_path) as source:
         image = source.convert("RGB")
     ratio = max(WIDTH / image.width, HEIGHT / image.height)
     resized = image.resize((round(image.width * ratio), round(image.height * ratio)), Image.Resampling.LANCZOS)
@@ -84,7 +104,7 @@ def main() -> int:
     parser.add_argument("--duration", type=int, default=15)
     parser.add_argument("--output", default="output/reel.mp4")
     parser.add_argument("--template", default=str(TEMPLATE),
-                        help="Optional 9:16 template path (useful for tests).")
+                        help="Optional 9:16 template path; if absent, a neon background is generated.")
     args = parser.parse_args()
 
     ffmpeg = shutil.which("ffmpeg")
@@ -92,7 +112,7 @@ def main() -> int:
         raise SystemExit("FFmpeg was not found on PATH.")
     template = Path(args.template).expanduser().resolve()
     if not template.exists():
-        raise SystemExit(f"Missing {template}. Upload the approved 9:16 template image to assets/template-9x16.png.")
+        template = None
     if not 3 <= args.duration <= 90:
         raise SystemExit("Duration must be between 3 and 90 seconds.")
 
@@ -109,6 +129,7 @@ def main() -> int:
         subprocess.run(cmd, check=True)
     finally:
         frame.unlink(missing_ok=True)
+        frame.with_name(frame.stem + ".background.png").unlink(missing_ok=True)
 
     print(f"Rendered branded Reel: {output}")
     print(f"On-screen title: {args.title}")
