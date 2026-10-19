@@ -89,28 +89,49 @@ def extract_lyrics_from_html(url: str, page_html: str) -> str:
     return lyrics[:MAX_EXCERPT_CHARS].rstrip()
 
 
+def _search_links(query: str) -> list[str]:
+    """Try public HTML search endpoints; never bypass a challenge or access control."""
+    endpoints = (
+        ("https://www.google.com/search?q=", "google"),
+        ("https://www.bing.com/search?q=", "bing"),
+        ("https://html.duckduckgo.com/html/?q=", "duckduckgo"),
+    )
+    for base, engine in endpoints:
+        try:
+            response = requests.get(
+                base + quote_plus(query),
+                headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.8"},
+                timeout=TIMEOUT,
+            )
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            links = []
+            for anchor in soup.select("a[href]"):
+                href = anchor.get("href", "").strip()
+                parsed = urlparse(href)
+                if parsed.hostname and (
+                    parsed.hostname.endswith("google.com")
+                    or parsed.hostname.endswith("bing.com")
+                    or parsed.hostname.endswith("duckduckgo.com")
+                ):
+                    target = parse_qs(parsed.query).get("uddg", [""])[0]
+                    href = unquote(target) if target else ""
+                if _allowed_url(href) and href not in links:
+                    links.append(href)
+            if links:
+                print(f"Search engine {engine} returned {len(links)} allowed result(s).", file=sys.stderr)
+                return links
+            print(f"Search engine {engine} returned no allowed result links.", file=sys.stderr)
+        except requests.RequestException as exc:
+            print(f"Search engine {engine} unavailable: {exc}", file=sys.stderr)
+    return []
+
+
 def find_lyrics_excerpt(title: str, artist: str) -> dict[str, str]:
     query = f'site:lyricstranslate.com OR site:azlyrics.com "{title}" "{artist}" lyrics'
-    search_url = "https://html.duckduckgo.com/html/?q=" + quote_plus(query)
-    response = requests.get(
-        search_url,
-        headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.8"},
-        timeout=TIMEOUT,
-    )
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    links = []
-    for anchor in soup.select("a.result__a, a[href]"):
-        href = anchor.get("href", "").strip()
-        parsed = urlparse(href)
-        if parsed.hostname and parsed.hostname.endswith("duckduckgo.com"):
-            target = parse_qs(parsed.query).get("uddg", [""])[0]
-            href = unquote(target) if target else ""
-        if _allowed_url(href) and href not in links:
-            links.append(href)
+    links = _search_links(query)
     if not links:
-        raise LyricsFetchError("Search returned no allowed lyrics-page links.")
+        raise LyricsFetchError("All public search endpoints returned no allowed lyrics-page links.")
 
     errors = []
     for url in links[:5]:
@@ -124,7 +145,6 @@ def find_lyrics_excerpt(title: str, artist: str) -> dict[str, str]:
         time.sleep(1.0)
 
     raise LyricsFetchError("No lyrics excerpt could be extracted. " + " | ".join(errors[:3]))
-
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
