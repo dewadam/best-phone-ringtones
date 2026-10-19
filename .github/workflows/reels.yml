@@ -24,6 +24,9 @@ jobs:
       DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
       META_AUDIO_ID: ${{ vars.META_AUDIO_ID }}
       REEL_CAPTION: ${{ vars.REEL_CAPTION }}
+      SONG_TITLE: ${{ vars.SONG_TITLE }}
+      ARTIST_NAME: ${{ vars.ARTIST_NAME }}
+      LYRIC_EXCERPT: ${{ vars.LYRIC_EXCERPT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,5 +44,12 @@ jobs:
           for name in ("IG_USER_ID", "IG_ACCESS_TOKEN", "META_GRAPH_VERSION", "PUBLIC_VIDEO_URL", "META_AUDIO_ID"):
               print(f"{name} configured =", bool(os.getenv(name)))
           PY
+      - name: Build emoji caption and SEO hashtags
+        run: |
+          if [ -n "$SONG_TITLE" ] && [ -n "$ARTIST_NAME" ]; then
+            python src/build_caption.py >> "$GITHUB_ENV"
+          else
+            echo "SONG_TITLE and ARTIST_NAME are not configured; using REEL_CAPTION fallback."
+          fi
       - name: Guarded publish call
         run: python src/instagram_publish.py
