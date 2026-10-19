@@ -16,6 +16,7 @@ GitHub Actions-based Instagram Reels automation scaffold for the **Best Phone Ri
 - `src/render_reel.py`: creates a short vertical MP4 from the template using FFmpeg.
 - `src/instagram_publish.py`: guarded Instagram Reels publishing flow.
 - `src/audio_provider.py`: audio-provider interface and capability notes.
+- `src/build_caption.py`: emoji-styled caption and SEO hashtag builder.
 - `config/settings.json`: safe defaults.
 - `.github/workflows/reels.yml`: scheduled/manual workflow.
 
@@ -34,6 +35,14 @@ GitHub Actions-based Instagram Reels automation scaffold for the **Best Phone Ri
 - `META_GRAPH_VERSION`: Graph API version approved for your app, e.g. `vXX.X` (set a currently supported version; do not copy an obsolete example).
 
 Audio API availability may require additional app setup and permissions. Do not assume every sound shown in the Instagram mobile app is available through API. The integration should use the exact audio identifiers and parameters returned by Meta's authorized API.
+
+## Reel captions: lyrics, emojis, SEO hashtags
+
+The caption builder creates an emoji-styled caption with the track title/artist, a short hook, and relevant hashtags such as `#iPhoneRingtone`, `#Ringtone`, `#PhoneSounds`, plus artist/track tags. Hashtags are selected from the title and artist metadata and deduplicated.
+
+**Lyrics handling:** do not scrape or reproduce full copyrighted lyrics. The builder accepts only a short lyric excerpt supplied by you or cleared for use; if none is supplied, it generates an original track-related hook instead.
+
+Set `SONG_TITLE`, `ARTIST_NAME`, and optionally `LYRIC_EXCERPT` in repository Actions variables. Keep the excerpt short and authorized.
 
 ## Publishing safety
 
