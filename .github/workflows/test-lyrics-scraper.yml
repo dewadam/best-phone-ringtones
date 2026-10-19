@@ -1,16 +1,22 @@
 name: Test Lyrics Scraper
 
 on:
+  push:
+    paths:
+      - "src/lyrics_scraper.py"
+      - ".github/workflows/test-lyrics-scraper.yml"
   workflow_dispatch:
     inputs:
       song_title:
         description: "Song title to search"
         required: true
         type: string
+        default: "Blinding Lights"
       artist_name:
         description: "Artist name to search"
         required: true
         type: string
+        default: "The Weeknd"
 
 permissions:
   contents: read
@@ -30,8 +36,8 @@ jobs:
           pip install requests "beautifulsoup4>=4.12,<5"
       - name: Fetch and validate a short excerpt
         env:
-          SONG_TITLE: ${{ inputs.song_title }}
-          ARTIST_NAME: ${{ inputs.artist_name }}
+          SONG_TITLE: ${{ inputs.song_title || 'Blinding Lights' }}
+          ARTIST_NAME: ${{ inputs.artist_name || 'The Weeknd' }}
         run: |
           set +e
           python src/lyrics_scraper.py "$SONG_TITLE" "$ARTIST_NAME" > excerpt.txt
