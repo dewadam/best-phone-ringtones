@@ -13,6 +13,7 @@ def main():
     p.add_argument("--duration", type=int, default=30)
     p.add_argument("--output", required=True)
     p.add_argument("--audio", default="", help="Audio file to use as the Reel soundtrack (replaces the template's silent track).")
+    p.add_argument("--no-audio", action="store_true", help="Drop the template's (silent) audio track entirely; used when Instagram attaches catalog music.")
     p.add_argument("--audio-start", type=float, default=0.0, help="Start offset (seconds) inside the audio file.")
     a = p.parse_args()
     src = (ROOT / a.input).resolve()
@@ -52,6 +53,8 @@ def main():
         af = f"afade=t=in:d=0.3,afade=t=out:st={fade_out}:d=1,loudnorm=I=-14:TP=-1.5:LRA=11"
         # The template's own audio track is digital silence, so it is replaced, not mixed.
         cmd += ["-map", "1:a:0", "-af", af]
+    elif a.no_audio:
+        cmd += ["-an"]
     else:
         cmd += ["-map", "0:a?"]
     cmd += ["-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",

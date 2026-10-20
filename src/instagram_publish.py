@@ -94,11 +94,17 @@ def main() -> int:
     print(f"Published Reel successfully. Instagram media ID: {media_id}")
     # Verify Instagram really attached catalog music (Meta field: media_audio_type = MUSIC | ORIGINAL_SOUND)
     if audio_id:
-        try:
-            info = api_request("GET", f"{GRAPH_BASE}/{API_VERSION}/{media_id}", params={"fields": "media_audio_type", "access_token": token})
-            kind = str(info.get("media_audio_type", "UNKNOWN")).upper()
-        except InstagramAPIError as exc:
-            kind = f"UNKNOWN ({exc})"
+        kind = "UNKNOWN"
+        for attempt in range(1, 7):  # the field can lag a few seconds behind publishing
+            try:
+                info = api_request("GET", f"{GRAPH_BASE}/{API_VERSION}/{media_id}", params={"fields": "media_audio_type,permalink", "access_token": token})
+                kind = str(info.get("media_audio_type", "UNKNOWN")).upper()
+                print(f"Check {attempt}: media_audio_type={kind} permalink={info.get('permalink')}")
+            except InstagramAPIError as exc:
+                kind = f"UNKNOWN ({exc})"
+            if kind.startswith("MUSIC"):
+                break
+            time.sleep(10)
         print(f"media_audio_type reported by Instagram: {kind}")
         if not kind.startswith("MUSIC"):
             print(f"::error::Reel was published but Instagram did NOT report catalog music (audio_id {audio_id}).", file=sys.stderr)
