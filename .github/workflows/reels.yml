@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       song_title:
-        description: "Instagram catalog song title"
+        description: "Song title shown on screen (empty/RANDOM = from file name)"
         required: true
         default: "RANDOM"
         type: string
@@ -12,6 +12,24 @@ on:
         description: "Artist name"
         required: true
         default: "RANDOM"
+        type: string
+      audio_source:
+        description: "instagram = attach song from Instagram catalog via API; file = mix your own MP3 from assets/audio into the video"
+        required: true
+        default: "instagram"
+        type: choice
+        options:
+          - instagram
+          - file
+      audio_file:
+        description: "(file mode) Audio file in repo, e.g. assets/audio/Artist - Title.mp3 (empty = random file from assets/audio)"
+        required: false
+        default: ""
+        type: string
+      audio_start:
+        description: "Start second inside the audio file (e.g. 45 to skip the intro)"
+        required: false
+        default: "0"
         type: string
       duration:
         description: "Reel duration in seconds (3-90)"
@@ -61,6 +79,9 @@ jobs:
           INPUT_TITLE: ${{ inputs.song_title }}
           INPUT_ARTIST: ${{ inputs.artist_name }}
           INPUT_DURATION: ${{ inputs.duration }}
+          INPUT_AUDIO_SOURCE: ${{ inputs.audio_source }}
+          INPUT_AUDIO_FILE: ${{ inputs.audio_file }}
+          INPUT_AUDIO_START: ${{ inputs.audio_start }}
         run: |
           TITLE="${INPUT_TITLE:-RANDOM}"
           ARTIST="${INPUT_ARTIST:-RANDOM}"
@@ -75,14 +96,22 @@ jobs:
             echo "SONG_TITLE=$TITLE"
             echo "ARTIST_NAME=$ARTIST"
             echo "REEL_DURATION=$DURATION"
+            echo "AUDIO_SOURCE=${INPUT_AUDIO_SOURCE:-instagram}"
+            echo "AUDIO_FILE=$INPUT_AUDIO_FILE"
+            echo "AUDIO_START=${INPUT_AUDIO_START:-0}"
           } >> "$GITHUB_ENV"
 
-      - name: Select random trending Instagram music
+      - name: Select Instagram catalog audio
+        if: ${{ inputs.audio_source != 'file' }}
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          META_API_VERSION: ${{ vars.META_API_VERSION || 'v26.0' }}
+          META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
         run: python src/select_trending_audio.py
+
+      - name: Pick soundtrack from assets/audio
+        if: ${{ inputs.audio_source == 'file' }}
+        run: python src/pick_audio.py
 
       - name: Build caption and hashtags
         run: |
@@ -97,12 +126,15 @@ jobs:
       - name: Render Reel visual
         run: |
           mkdir -p output
+          AUDIO_ARGS=()
+          if [ "$AUDIO_SOURCE" = "file" ]; then AUDIO_ARGS=(--audio "$AUDIO_PATH" --audio-start "$AUDIO_START"); fi
           if [ -f assets/template-reel.mp4 ]; then
             python src/render_template_video.py \
               --input assets/template-reel.mp4 \
               --title "$SONG_TITLE" \
               --artist "$ARTIST_NAME" \
               --duration "$REEL_DURATION" \
+              "${AUDIO_ARGS[@]}" \
               --output output/best-phone-ringtones-reel.mp4
           else
             echo "::error::Template video missing: upload your MP4 to assets/template-reel.mp4 before running."
@@ -117,17 +149,26 @@ jobs:
             -of default=noprint_wrappers=1 output/best-phone-ringtones-reel.mp4
           ffprobe -v error -show_entries format=duration \
             -of default=noprint_wrappers=1 output/best-phone-ringtones-reel.mp4
+          if [ "$AUDIO_SOURCE" = "file" ]; then
+            # Fail the run if the Reel has no audible sound
+            test -n "$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 output/best-phone-ringtones-reel.mp4)" \
+              || { echo "::error::Rendered video has no audio stream"; exit 1; }
+            MEAN=$(ffmpeg -hide_banner -i output/best-phone-ringtones-reel.mp4 -vn -af volumedetect -f null - 2>&1 | sed -n 's/.*mean_volume: \(-\?[0-9.]*\) dB.*/\1/p')
+            echo "Mean volume: ${MEAN} dB"
+            awk -v m="$MEAN" 'BEGIN{exit !(m > -60)}' || { echo "::error::Audio is silent"; exit 1; }
+          fi
 
-      - name: Publish Reel with Instagram catalog audio
+      - name: Publish Reel
         if: ${{ inputs.publish_now == true }}
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          META_API_VERSION: ${{ vars.META_API_VERSION || 'v26.0' }}
+          META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
           SONG_TITLE: ${{ env.SONG_TITLE }}
           ARTIST_NAME: ${{ env.ARTIST_NAME }}
-          IG_AUDIO_ID: ${{ env.IG_AUDIO_ID }}
           REEL_CAPTION: ${{ env.REEL_CAPTION }}
+          IG_AUDIO_ID: ${{ env.IG_AUDIO_ID }}
+          AUDIO_SOURCE: ${{ env.AUDIO_SOURCE }}
           VIDEO_PATH: output/best-phone-ringtones-reel.mp4
           INSTAGRAM_PUBLISH: "true"
         run: python src/instagram_publish.py
