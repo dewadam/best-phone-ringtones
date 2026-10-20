@@ -36,6 +36,8 @@ def upload_resumable(user_id: str, token: str, video_path: Path, caption: str, a
         # Meta Audio API: audio is attached via the audio_configuration JSON object (not a bare audio_id field).
         payload["audio_configuration"] = json.dumps({"audio_id": audio_id, "audio_volume": 100})
     container = api_request("POST", create_url, data=payload)
+    print("Container created:", json.dumps({k: v for k, v in container.items() if k != "access_token"}))
+    print("audio_configuration sent:", payload.get("audio_configuration", "NONE"))
     container_id = container.get("id")
     if not container_id:
         raise InstagramAPIError("Container creation response did not include an ID.")
@@ -90,6 +92,17 @@ def main() -> int:
     if not media_id:
         raise InstagramAPIError("Publish response did not include the resulting media ID.")
     print(f"Published Reel successfully. Instagram media ID: {media_id}")
+    # Verify Instagram really attached catalog music (Meta field: media_audio_type = MUSIC | ORIGINAL_SOUND)
+    if audio_id:
+        try:
+            info = api_request("GET", f"{GRAPH_BASE}/{API_VERSION}/{media_id}", params={"fields": "media_audio_type", "access_token": token})
+            kind = str(info.get("media_audio_type", "UNKNOWN")).upper()
+        except InstagramAPIError as exc:
+            kind = f"UNKNOWN ({exc})"
+        print(f"media_audio_type reported by Instagram: {kind}")
+        if not kind.startswith("MUSIC"):
+            print(f"::error::Reel was published but Instagram did NOT report catalog music (audio_id {audio_id}).", file=sys.stderr)
+            return 2
     return 0
 
 if __name__ == "__main__":
