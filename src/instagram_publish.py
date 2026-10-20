@@ -166,7 +166,9 @@ def main() -> int:
     if not video_path.is_file() or video_path.stat().st_size == 0:
         raise InstagramAPIError(f"Video file missing or empty: {video_path}")
 
-    audio = search_audio(user_id, token, title, artist)
+    selected_audio_id = os.getenv("IG_AUDIO_ID", "").strip()
+    audio = ({"id": selected_audio_id, "title": title or "Trending audio", "artist_name": artist or "Instagram audio"}
+             if selected_audio_id else search_audio(user_id, token, title, artist))
     # Fill metadata from the selected trending track when workflow inputs were left blank.
     if not title:
         title = str(audio.get("title", "Trending audio"))
