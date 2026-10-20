@@ -5,10 +5,13 @@ import requests
 
 version = os.getenv("META_API_VERSION", "v24.0")
 token = os.getenv("IG_ACCESS_TOKEN", "").strip()
+user_id = os.getenv("IG_USER_ID", "").strip()
 if not token:
     raise SystemExit("Missing IG_ACCESS_TOKEN secret.")
+if not user_id:
+    raise SystemExit("Missing IG_USER_ID secret.")
 url = f"https://graph.facebook.com/{version}/ig_audio"
-r = requests.get(url, params={"audio_type": "music", "access_token": token}, timeout=60)
+r = requests.get(url, params={"ig_user_id": user_id, "audio_type": "music", "access_token": token}, timeout=60)
 try:
     data = r.json()
 except ValueError:
