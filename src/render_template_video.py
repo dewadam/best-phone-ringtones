@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a vertical MP4 template with compact song metadata inside the central square display."""
+"""Render a vertical MP4 template with centered metadata while preserving source audio."""
 import argparse, shutil, subprocess
 from pathlib import Path
 
@@ -34,9 +34,9 @@ def main():
           f"drawtext=fontfile={font}:text='{artist}':fontcolor=0xFF46CD:fontsize=38:x=(w-text_w)/2:y=860:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
           "drawtext=fontfile=" + font + ":text='BEST PHONE RINGTONES':fontcolor=0x00E8FF:fontsize=23:x=(w-text_w)/2:y=920:shadowcolor=black@0.9:shadowx=1:shadowy=1,"
           "format=yuv420p")
-    cmd = [ffmpeg, "-y", "-i", str(src), "-t", str(a.duration), "-vf", vf, "-an", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", str(out)]
+    cmd = [ffmpeg, "-y", "-i", str(src), "-t", str(a.duration), "-vf", vf, "-map", "0:v:0", "-map", "0:a?", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(out)]
     subprocess.run(cmd, check=True)
-    print(f"Rendered supplied MP4 template: {out}")
+    print(f"Rendered supplied MP4 template with source audio preserved when present: {out}")
 
 if __name__ == "__main__":
     main()
