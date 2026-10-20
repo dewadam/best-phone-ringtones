@@ -79,6 +79,7 @@ jobs:
 
       - name: Select random trending Instagram music
         env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
         run: python src/select_trending_audio.py
