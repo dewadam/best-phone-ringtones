@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Render a vertical MP4 template with centered metadata while preserving source audio."""
-import argparse, shutil, subprocess
+import argparse, shutil, subprocess, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,15 +25,19 @@ def main():
     if not ffmpeg:
         raise SystemExit("FFmpeg was not found on PATH.")
     out.parent.mkdir(parents=True, exist_ok=True)
-    def esc(s):
-        return s.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace("%", "\\%").replace(",", "\\,").replace("[", "\\[").replace("]", "\\]")
-    title = esc(a.title[:50]); artist = esc(a.artist[:50])
+    # Text goes through files (textfile=) so apostrophes, colons, commas, % etc. never need filter escaping.
+    tmp = Path(tempfile.mkdtemp(prefix="reel-text-"))
+    def textfile(name, value):
+        f = tmp / name
+        f.write_text(" ".join(value.split())[:50], encoding="utf-8")
+        return f.as_posix()
+    title_f = textfile("title.txt", a.title); artist_f = textfile("artist.txt", a.artist)
     font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     # No rectangle/panel: place compact text directly inside the template's central square screen.
     # 1080x1920 canvas; the square display is approximately x=240..840, y=540..1110.
     vf = ("scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
-          f"drawtext=fontfile={font}:text='{title}':fontcolor=white:fontsize=50:x=(w-text_w)/2:y=790:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
-          f"drawtext=fontfile={font}:text='{artist}':fontcolor=0xFF46CD:fontsize=38:x=(w-text_w)/2:y=860:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
+          f"drawtext=fontfile={font}:textfile={title_f}:expansion=none:fontcolor=white:fontsize=50:x=(w-text_w)/2:y=790:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
+          f"drawtext=fontfile={font}:textfile={artist_f}:expansion=none:fontcolor=0xFF46CD:fontsize=38:x=(w-text_w)/2:y=860:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
           "drawtext=fontfile=" + font + ":text='BEST PHONE RINGTONES':fontcolor=0x00E8FF:fontsize=23:x=(w-text_w)/2:y=920:shadowcolor=black@0.9:shadowx=1:shadowy=1,"
           "format=yuv420p")
     audio = (ROOT / a.audio).resolve() if a.audio else None
