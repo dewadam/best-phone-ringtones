@@ -52,6 +52,20 @@ def upload_resumable(user_id: str, token: str, video_path: Path, caption: str, a
         raise InstagramAPIError(f"Resumable video upload failed (HTTP {response.status_code}): " + json.dumps(upload_payload, ensure_ascii=False)[:2000])
     return str(container_id)
 
+def create_container_from_url(user_id: str, token: str, video_url: str, caption: str, audio_id: str = "") -> str:
+    """Documented Meta flow for audio_configuration: Instagram downloads the Reel from a public video_url."""
+    create_url = f"{GRAPH_BASE}/{API_VERSION}/{user_id}/media"
+    payload = {"media_type": "REELS", "video_url": video_url, "caption": caption, "share_to_feed": "true", "access_token": token}
+    if audio_id:
+        payload["audio_configuration"] = json.dumps({"audio_id": audio_id, "audio_volume": 100})
+    container = api_request("POST", create_url, data=payload)
+    print("Container created (video_url):", json.dumps(container))
+    print("audio_configuration sent:", payload.get("audio_configuration", "NONE"))
+    container_id = container.get("id")
+    if not container_id:
+        raise InstagramAPIError("Container creation response did not include an ID.")
+    return str(container_id)
+
 def wait_until_ready(container_id: str, token: str, timeout_seconds: int = 300) -> None:
     url = f"{GRAPH_BASE}/{API_VERSION}/{container_id}"
     deadline = time.monotonic() + timeout_seconds
@@ -85,7 +99,13 @@ def main() -> int:
     if os.getenv("AUDIO_SOURCE", "instagram") != "file" and not audio_id:
         raise InstagramAPIError("No IG_AUDIO_ID selected; refusing to publish a silent Reel.")
     print(f"Publishing Reel: {title} — {artist} | audio: {'Instagram catalog id ' + audio_id if audio_id else 'baked into MP4'}")
-    container_id = upload_resumable(user_id, token, video_path, caption, audio_id)
+    video_url = os.getenv("VIDEO_URL", "").strip()
+    if video_url:
+        print(f"Using video_url upload: {video_url}")
+        container_id = create_container_from_url(user_id, token, video_url, caption, audio_id)
+    else:
+        print("WARNING: no VIDEO_URL; falling back to resumable upload (audio_configuration is not documented for it).")
+        container_id = upload_resumable(user_id, token, video_path, caption, audio_id)
     wait_until_ready(container_id, token)
     publish = api_request("POST", f"{GRAPH_BASE}/{API_VERSION}/{user_id}/media_publish", data={"creation_id": container_id, "access_token": token})
     media_id = publish.get("id")
