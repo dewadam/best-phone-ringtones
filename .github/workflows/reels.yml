@@ -6,12 +6,12 @@ on:
       song_title:
         description: "Instagram catalog song title"
         required: true
-        default: "TRALALA"
+        default: "RANDOM"
         type: string
       artist_name:
         description: "Artist name"
         required: true
-        default: "Manifest"
+        default: "RANDOM"
         type: string
       duration:
         description: "Reel duration in seconds (3-90)"
@@ -62,8 +62,10 @@ jobs:
           INPUT_ARTIST: ${{ inputs.artist_name }}
           INPUT_DURATION: ${{ inputs.duration }}
         run: |
-          TITLE="${INPUT_TITLE:-TRALALA}"
-          ARTIST="${INPUT_ARTIST:-Manifest}"
+          TITLE="${INPUT_TITLE:-RANDOM}"
+          ARTIST="${INPUT_ARTIST:-RANDOM}"
+          if [ "$TITLE" = "RANDOM" ]; then TITLE=""; fi
+          if [ "$ARTIST" = "RANDOM" ]; then ARTIST=""; fi
           DURATION="${INPUT_DURATION:-30}"
           if ! [[ "$DURATION" =~ ^[0-9]+$ ]] || [ "$DURATION" -lt 3 ] || [ "$DURATION" -gt 90 ]; then
             echo "::error::Duration must be an integer between 3 and 90 seconds."
@@ -74,6 +76,13 @@ jobs:
             echo "ARTIST_NAME=$ARTIST"
             echo "REEL_DURATION=$DURATION"
           } >> "$GITHUB_ENV"
+
+      - name: Select random trending Instagram music
+        if: ${{ inputs.publish_now == true }}
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
+        run: python src/select_trending_audio.py
 
       - name: Build caption and hashtags
         run: |
