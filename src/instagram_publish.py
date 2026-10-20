@@ -12,7 +12,7 @@ from typing import Any
 import requests
 
 GRAPH_BASE = "https://graph.facebook.com"
-API_VERSION = os.getenv("META_API_VERSION", "v24.0")
+API_VERSION = os.getenv("META_API_VERSION", "v26.0")
 TIMEOUT = 60
 
 class InstagramAPIError(RuntimeError):
@@ -41,13 +41,14 @@ def search_audio(user_id: str, token: str, title: str = "", artist: str = "") ->
         results = [results]
     if not isinstance(results, list) or not results:
         raise InstagramAPIError("Meta returned no eligible trending music. " + json.dumps(payload, ensure_ascii=False)[:1500])
-    usable = [item for item in results if isinstance(item, dict) and item.get("id")]
+    usable = [item for item in results if isinstance(item, dict) and (item.get("id") or item.get("audio_id"))]
     if not usable:
         raise InstagramAPIError("Meta audio response contained no usable audio IDs.")
     import random
     chosen = random.choice(usable)
+    chosen["id"] = str(chosen.get("id") or chosen.get("audio_id"))
     chosen["title"] = chosen.get("title") or chosen.get("name") or "Trending audio"
-    chosen["artist_name"] = chosen.get("artist_name") or chosen.get("artist") or chosen.get("username") or "Instagram audio"
+    chosen["artist_name"] = chosen.get("artist_name") or chosen.get("display_artist") or chosen.get("artist") or chosen.get("ig_username") or chosen.get("username") or "Instagram audio"
     print("Selected Instagram trending audio:", json.dumps({"id": chosen.get("id"), "title": chosen.get("title"), "artist_name": chosen.get("artist_name")}, ensure_ascii=False))
     return chosen
 
