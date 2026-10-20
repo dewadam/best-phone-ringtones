@@ -47,55 +47,40 @@ def api_request(method: str, url: str, **kwargs: Any) -> dict[str, Any]:
     return payload
 
 
-def search_audio(user_id: str, token: str, title: str, artist: str) -> dict[str, Any]:
+def search_audio(user_id: str, token: str, title: str = "", artist: str = "") -> dict[str, Any]:
+    """Choose a random currently trending licensed music track from Meta's IG Audio API."""
+    url = f"{GRAPH_BASE}/{API_VERSION}/ig_audio"
+    params: dict[str, Any] = {
+        "audio_type": "music",
+        "access_token": token,
+    }
+    # When a title is explicitly provided, search for it; otherwise Meta returns trending music.
     query = " ".join(part for part in (title.strip(), artist.strip()) if part)
-    if not query:
-        raise InstagramAPIError("SONG_TITLE or ARTIST_NAME is required for audio search.")
-    url = f"{GRAPH_BASE}/{API_VERSION}/{user_id}/audio"
-    payload = api_request(
-        "GET", url,
-        params={"query": query, "access_token": token},
-    )
-    # Meta may return a data array or a single result depending on API version.
-    results = payload.get("data")
-    if results is None and payload.get("id"):
-        results = [payload]
+    if query:
+        params["q"] = query
+    payload = api_request("GET", url, params=params)
+    results = payload.get("data") or payload.get("audio") or []
+    if isinstance(results, dict):
+        results = [results]
     if not isinstance(results, list) or not results:
         raise InstagramAPIError(
-            f"No Instagram catalog audio found for {query!r}. Response: "
+            "Meta returned no eligible trending music. "
             + json.dumps(payload, ensure_ascii=False)[:1500]
         )
-
-    title_norm = title.casefold().strip()
-    artist_norm = artist.casefold().strip()
-    ranked = []
-    for item in results:
-        if not isinstance(item, dict) or not item.get("id"):
-            continue
-        result_title = str(item.get("title", ""))
-        result_artist = str(item.get("artist_name", item.get("artist", "")))
-        score = 0
-        if title_norm and title_norm == result_title.casefold().strip():
-            score += 4
-        elif title_norm and title_norm in result_title.casefold():
-            score += 2
-        if artist_norm and artist_norm == result_artist.casefold().strip():
-            score += 4
-        elif artist_norm and artist_norm in result_artist.casefold():
-            score += 2
-        ranked.append((score, item))
-    if not ranked:
-        raise InstagramAPIError("Audio API returned no usable result with an ID.")
-    ranked.sort(key=lambda pair: pair[0], reverse=True)
-    best_score, best = ranked[0]
-    if len(ranked) > 1 and best_score == ranked[1][0]:
-        print("Audio search returned tied candidates; using first API result:", file=sys.stderr)
-    print("Selected Instagram audio:", json.dumps({
-        "id": best.get("id"),
-        "title": best.get("title"),
-        "artist_name": best.get("artist_name", best.get("artist")),
+    usable = [item for item in results if isinstance(item, dict) and item.get("id")]
+    if not usable:
+        raise InstagramAPIError("Meta audio response contained no usable audio IDs.")
+    # Random selection across the eligible results, as requested.
+    import random
+    chosen = random.choice(usable)
+    chosen["title"] = chosen.get("title") or chosen.get("name") or "Trending audio"
+    chosen["artist_name"] = chosen.get("artist_name") or chosen.get("artist") or chosen.get("username") or "Instagram audio"
+    print("Selected Instagram trending audio:", json.dumps({
+        "id": chosen.get("id"),
+        "title": chosen.get("title"),
+        "artist_name": chosen.get("artist_name"),
     }, ensure_ascii=False))
-    return best
+    return chosen
 
 
 def upload_resumable(user_id: str, token: str, video_path: Path,
@@ -175,7 +160,6 @@ def main() -> int:
 
     missing = [name for name, value in {
         "IG_USER_ID": user_id, "IG_ACCESS_TOKEN": token,
-        "SONG_TITLE": title, "ARTIST_NAME": artist,
     }.items() if not value]
     if missing:
         raise InstagramAPIError("Missing required environment variables: " + ", ".join(missing))
@@ -183,6 +167,12 @@ def main() -> int:
         raise InstagramAPIError(f"Video file missing or empty: {video_path}")
 
     audio = search_audio(user_id, token, title, artist)
+    # Fill metadata from the selected trending track when workflow inputs were left blank.
+    if not title:
+        title = str(audio.get("title", "Trending audio"))
+    if not artist:
+        artist = str(audio.get("artist_name", "Instagram audio"))
+    print(f"Publishing with selected track: {title} — {artist}")
     container_id = upload_resumable(user_id, token, video_path, caption, str(audio["id"]))
     wait_until_ready(container_id, token)
 
