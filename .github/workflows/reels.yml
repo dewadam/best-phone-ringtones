@@ -78,7 +78,6 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Select random trending Instagram music
-        if: ${{ inputs.publish_now == true }}
         env:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
@@ -97,11 +96,17 @@ jobs:
       - name: Render Reel visual
         run: |
           mkdir -p output
-          python src/render_reel.py \
-            --title "$SONG_TITLE" \
-            --artist "$ARTIST_NAME" \
-            --duration "$REEL_DURATION" \
-            --output output/best-phone-ringtones-reel.mp4
+          if [ -f assets/template-reel.mp4 ]; then
+            python src/render_template_video.py \
+              --input assets/template-reel.mp4 \
+              --title "$SONG_TITLE" \
+              --artist "$ARTIST_NAME" \
+              --duration "$REEL_DURATION" \
+              --output output/best-phone-ringtones-reel.mp4
+          else
+            echo "::error::Template video missing: upload your MP4 to assets/template-reel.mp4 before running."
+            exit 1
+          fi
 
       - name: Validate generated video
         run: |
@@ -118,8 +123,9 @@ jobs:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
-          SONG_TITLE: ${{ inputs.song_title }}
-          ARTIST_NAME: ${{ inputs.artist_name }}
+          SONG_TITLE: ${{ env.SONG_TITLE }}
+          ARTIST_NAME: ${{ env.ARTIST_NAME }}
+          IG_AUDIO_ID: ${{ env.IG_AUDIO_ID }}
           REEL_CAPTION: ${{ env.REEL_CAPTION }}
           VIDEO_PATH: output/best-phone-ringtones-reel.mp4
           INSTAGRAM_PUBLISH: "true"
