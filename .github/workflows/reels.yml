@@ -81,7 +81,7 @@ jobs:
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
+          META_API_VERSION: ${{ vars.META_API_VERSION || 'v26.0' }}
         run: python src/select_trending_audio.py
 
       - name: Build caption and hashtags
@@ -123,7 +123,7 @@ jobs:
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          META_API_VERSION: ${{ vars.META_API_VERSION || 'v24.0' }}
+          META_API_VERSION: ${{ vars.META_API_VERSION || 'v26.0' }}
           SONG_TITLE: ${{ env.SONG_TITLE }}
           ARTIST_NAME: ${{ env.ARTIST_NAME }}
           IG_AUDIO_ID: ${{ env.IG_AUDIO_ID }}
