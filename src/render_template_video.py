@@ -30,9 +30,9 @@ def main():
     # No rectangle/panel: place compact text directly inside the template's central square screen.
     # 1080x1920 canvas; the square display is approximately x=240..840, y=540..1110.
     vf = ("scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
-          f"drawtext=fontfile={font}:text='{title}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=790:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
-          f"drawtext=fontfile={font}:text='{artist}':fontcolor=0xFF46CD:fontsize=32:x=(w-text_w)/2:y=860:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
-          "drawtext=fontfile=" + font + ":text='BEST PHONE RINGTONES':fontcolor=0x00E8FF:fontsize=19:x=(w-text_w)/2:y=920:shadowcolor=black@0.9:shadowx=1:shadowy=1,"
+          f"drawtext=fontfile={font}:text='{title}':fontcolor=white:fontsize=50:x=(w-text_w)/2:y=790:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
+          f"drawtext=fontfile={font}:text='{artist}':fontcolor=0xFF46CD:fontsize=38:x=(w-text_w)/2:y=860:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
+          "drawtext=fontfile=" + font + ":text='BEST PHONE RINGTONES':fontcolor=0x00E8FF:fontsize=23:x=(w-text_w)/2:y=920:shadowcolor=black@0.9:shadowx=1:shadowy=1,"
           "format=yuv420p")
     cmd = [ffmpeg, "-y", "-i", str(src), "-t", str(a.duration), "-vf", vf, "-an", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", str(out)]
     subprocess.run(cmd, check=True)
