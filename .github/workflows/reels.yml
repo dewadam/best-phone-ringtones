@@ -21,6 +21,16 @@ on:
         options:
           - instagram
           - file
+      lyric_excerpt:
+        description: "Optional lyric line for the caption (max 90 chars; only text you are allowed to use)"
+        required: false
+        default: ""
+        type: string
+      fetch_lyrics:
+        description: "Try to auto-fetch a short lyric excerpt (best effort, may fail; see README)"
+        required: false
+        default: false
+        type: boolean
       audio_file:
         description: "(file mode) Audio file in repo, e.g. assets/audio/Artist - Title.mp3 (empty = random file from assets/audio)"
         required: false
@@ -42,7 +52,8 @@ on:
         default: false
         type: boolean
   schedule:
-    - cron: "17 12 * * *"
+    # 15 runs per day: every hour at minute 07, 05:00-19:00 UTC (= 08:07-22:07 Istanbul time)
+    - cron: "7 5-19 * * *"
 
 permissions:
   contents: write   # needed to stage the MP4 on a temporary branch (public video_url for Instagram)
@@ -82,7 +93,17 @@ jobs:
           INPUT_AUDIO_SOURCE: ${{ inputs.audio_source }}
           INPUT_AUDIO_FILE: ${{ inputs.audio_file }}
           INPUT_AUDIO_START: ${{ inputs.audio_start }}
+          INPUT_PUBLISH_NOW: ${{ inputs.publish_now }}
+          EVENT_NAME: ${{ github.event_name }}
+          AUTO_PUBLISH: ${{ vars.AUTO_PUBLISH }}
         run: |
+          # Scheduled (daily) runs publish automatically unless repo variable AUTO_PUBLISH is set to "false".
+          # Manual runs publish only when the publish_now box is ticked.
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            if [ "$AUTO_PUBLISH" = "false" ]; then PUBLISH=false; else PUBLISH=true; fi
+          else
+            PUBLISH="$INPUT_PUBLISH_NOW"
+          fi
           TITLE="${INPUT_TITLE:-RANDOM}"
           ARTIST="${INPUT_ARTIST:-RANDOM}"
           if [ "$TITLE" = "RANDOM" ]; then TITLE=""; fi
@@ -99,6 +120,7 @@ jobs:
             echo "AUDIO_SOURCE=${INPUT_AUDIO_SOURCE:-instagram}"
             echo "AUDIO_FILE=$INPUT_AUDIO_FILE"
             echo "AUDIO_START=${INPUT_AUDIO_START:-0}"
+            echo "PUBLISH_NOW=$PUBLISH"
           } >> "$GITHUB_ENV"
 
       - name: Select Instagram catalog audio
@@ -114,7 +136,17 @@ jobs:
         run: python src/pick_audio.py
 
       - name: Build caption and hashtags
+        env:
+          INPUT_LYRIC: ${{ inputs.lyric_excerpt }}
+          FETCH_LYRICS: ${{ inputs.fetch_lyrics }}
         run: |
+          LYRIC_EXCERPT="$INPUT_LYRIC"
+          if [ -z "$LYRIC_EXCERPT" ] && [ "$FETCH_LYRICS" = "true" ]; then
+            LYRIC_EXCERPT=$(python src/lyrics_scraper.py "$SONG_TITLE" "$ARTIST_NAME" 2>lyrics.err || true)
+            cat lyrics.err || true
+            [ -z "$LYRIC_EXCERPT" ] && echo "No lyric excerpt fetched; using the default hook."
+          fi
+          export LYRIC_EXCERPT
           python src/build_caption.py > output_caption.txt
           cat output_caption.txt
           {
@@ -159,7 +191,7 @@ jobs:
           fi
 
       - name: Stage video at a public URL (temporary branch)
-        if: ${{ inputs.publish_now == true }}
+        if: ${{ env.PUBLISH_NOW == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -186,7 +218,7 @@ jobs:
           echo "VIDEO_URL=$URL" >> "$GITHUB_ENV"
 
       - name: Publish Reel
-        if: ${{ inputs.publish_now == true }}
+        if: ${{ env.PUBLISH_NOW == 'true' }}
         env:
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
@@ -196,19 +228,35 @@ jobs:
           REEL_CAPTION: ${{ env.REEL_CAPTION }}
           IG_AUDIO_ID: ${{ env.IG_AUDIO_ID }}
           AUDIO_SOURCE: ${{ env.AUDIO_SOURCE }}
+          AUDIO_PATH: ${{ env.AUDIO_PATH }}
           VIDEO_URL: ${{ env.VIDEO_URL }}
           VIDEO_PATH: output/best-phone-ringtones-reel.mp4
           INSTAGRAM_PUBLISH: "true"
         run: python src/instagram_publish.py
 
+      - name: Save used-audio history (commit to repo)
+        if: ${{ success() && env.PUBLISH_NOW == 'true' }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/used_audio.json
+          if git diff --cached --quiet; then echo "No history change."; exit 0; fi
+          git commit -m "Record posted audio [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase -q origin "${GITHUB_REF_NAME}" && git push -q origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          echo "::error::Could not push data/used_audio.json; the song may repeat."
+          exit 1
+
       - name: Remove staging branch
-        if: ${{ always() && inputs.publish_now == true }}
+        if: ${{ always() && env.PUBLISH_NOW == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete reel-staging || true
 
       - name: Save Reel and caption as workflow artifacts
-        if: ${{ inputs.publish_now != true }}
+        if: ${{ env.PUBLISH_NOW != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: best-phone-ringtones-reel
@@ -222,7 +270,7 @@ jobs:
         if: always()
         run: |
           echo "Video generation completed."
-          if [ "${{ inputs.publish_now }}" = "true" ]; then
+          if [ "$PUBLISH_NOW" = "true" ]; then
             echo "Instagram publish was requested. Check the preceding step for API result."
           else
             echo "Preview-only run: no Instagram post was made."
