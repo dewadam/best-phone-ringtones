@@ -28,34 +28,14 @@ def api_request(method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         raise InstagramAPIError(f"Instagram API request failed (HTTP {response.status_code}): " + json.dumps(payload, ensure_ascii=False)[:2500])
     return payload
 
-def search_audio(user_id: str, token: str, title: str = "", artist: str = "") -> dict[str, Any]:
-    """Choose a random currently trending licensed music track from Meta's IG Audio API."""
-    url = f"{GRAPH_BASE}/{API_VERSION}/ig_audio"
-    params: dict[str, Any] = {"ig_user_id": user_id, "audio_type": "music", "access_token": token}
-    query = " ".join(part for part in (title.strip(), artist.strip()) if part)
-    if query:
-        params["q"] = query
-    payload = api_request("GET", url, params=params)
-    results = payload.get("data") or payload.get("audio") or []
-    if isinstance(results, dict):
-        results = [results]
-    if not isinstance(results, list) or not results:
-        raise InstagramAPIError("Meta returned no eligible trending music. " + json.dumps(payload, ensure_ascii=False)[:1500])
-    usable = [item for item in results if isinstance(item, dict) and (item.get("id") or item.get("audio_id"))]
-    if not usable:
-        raise InstagramAPIError("Meta audio response contained no usable audio IDs.")
-    import random
-    chosen = random.choice(usable)
-    chosen["id"] = str(chosen.get("id") or chosen.get("audio_id"))
-    chosen["title"] = chosen.get("title") or chosen.get("name") or "Trending audio"
-    chosen["artist_name"] = chosen.get("artist_name") or chosen.get("display_artist") or chosen.get("artist") or chosen.get("ig_username") or chosen.get("username") or "Instagram audio"
-    print("Selected Instagram trending audio:", json.dumps({"id": chosen.get("id"), "title": chosen.get("title"), "artist_name": chosen.get("artist_name")}, ensure_ascii=False))
-    return chosen
-
-def upload_resumable(user_id: str, token: str, video_path: Path, caption: str, audio_id: str) -> str:
+def upload_resumable(user_id: str, token: str, video_path: Path, caption: str, audio_id: str = "") -> str:
     size = video_path.stat().st_size
     create_url = f"{GRAPH_BASE}/{API_VERSION}/{user_id}/media"
-    container = api_request("POST", create_url, data={"media_type": "REELS", "upload_type": "resumable", "caption": caption, "audio_id": audio_id, "share_to_feed": "true", "access_token": token})
+    payload = {"media_type": "REELS", "upload_type": "resumable", "caption": caption, "share_to_feed": "true", "access_token": token}
+    if audio_id:
+        # Meta Audio API: audio is attached via the audio_configuration JSON object (not a bare audio_id field).
+        payload["audio_configuration"] = json.dumps({"audio_id": audio_id, "audio_volume": 100})
+    container = api_request("POST", create_url, data=payload)
     container_id = container.get("id")
     if not container_id:
         raise InstagramAPIError("Container creation response did not include an ID.")
@@ -99,14 +79,11 @@ def main() -> int:
         raise InstagramAPIError("Missing required environment variables: " + ", ".join(missing))
     if not video_path.is_file() or video_path.stat().st_size == 0:
         raise InstagramAPIError(f"Video file missing or empty: {video_path}")
-    selected_audio_id = os.getenv("IG_AUDIO_ID", "").strip()
-    audio = {"id": selected_audio_id, "title": title or "Trending audio", "artist_name": artist or "Instagram audio"} if selected_audio_id else search_audio(user_id, token, title, artist)
-    if not title:
-        title = str(audio.get("title", "Trending audio"))
-    if not artist:
-        artist = str(audio.get("artist_name", "Instagram audio"))
-    print(f"Publishing with selected track: {title} — {artist}")
-    container_id = upload_resumable(user_id, token, video_path, caption, str(audio["id"]))
+    audio_id = os.getenv("IG_AUDIO_ID", "").strip()
+    if os.getenv("AUDIO_SOURCE", "instagram") != "file" and not audio_id:
+        raise InstagramAPIError("No IG_AUDIO_ID selected; refusing to publish a silent Reel.")
+    print(f"Publishing Reel: {title} — {artist} | audio: {'Instagram catalog id ' + audio_id if audio_id else 'baked into MP4'}")
+    container_id = upload_resumable(user_id, token, video_path, caption, audio_id)
     wait_until_ready(container_id, token)
     publish = api_request("POST", f"{GRAPH_BASE}/{API_VERSION}/{user_id}/media_publish", data={"creation_id": container_id, "access_token": token})
     media_id = publish.get("id")

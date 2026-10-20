@@ -22,7 +22,14 @@ Inputs:
 - `duration`: 3–90 seconds (default 30)
 - `publish_now`: leave unchecked to create a preview only; check it only after the Meta app, account, permissions and repository secrets are configured.
 
-The preview MP4 is silent. It is saved as a GitHub Actions artifact when publishing is not requested.
+The MP4 contains the soundtrack from `assets/audio/` (see below). It is saved as a GitHub Actions artifact when publishing is not requested.
+
+## Adding sound (important)
+
+The template MP4's own audio track is digital silence, so the video is silent unless a soundtrack is added. Two modes (`audio_source` input):
+
+- **instagram** (default, also used by the daily schedule): Meta's [Instagram Audio API](https://developers.facebook.com/docs/instagram-platform/content-publishing/audio-api/) searches the catalog (`GET /ig_audio?audio_type=music&user_id=...&search_query=...`) and the Reel is created with `audio_configuration={"audio_id":...}`. Needs Facebook Login, Graph API v22+ and `instagram_basic` + `instagram_content_publish`. Only audio authorized for third-party use is returned, so a specific song may not exist; then the run fails instead of posting silently.
+- **file**: upload `Artist - Title.mp3` to `assets/audio/`; it is mixed into the MP4 (fade + loudness normalisation). The run fails if the result is silent. Use music you own/licensed; Instagram may mute copyrighted audio.
 
 ## Configure Instagram API publishing
 

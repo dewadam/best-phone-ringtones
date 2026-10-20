@@ -12,6 +12,8 @@ def main():
     p.add_argument("--artist", required=True)
     p.add_argument("--duration", type=int, default=30)
     p.add_argument("--output", required=True)
+    p.add_argument("--audio", default="", help="Audio file to use as the Reel soundtrack (replaces the template's silent track).")
+    p.add_argument("--audio-start", type=float, default=0.0, help="Start offset (seconds) inside the audio file.")
     a = p.parse_args()
     src = (ROOT / a.input).resolve()
     out = (ROOT / a.output).resolve()
@@ -34,7 +36,23 @@ def main():
           f"drawtext=fontfile={font}:text='{artist}':fontcolor=0xFF46CD:fontsize=38:x=(w-text_w)/2:y=860:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
           "drawtext=fontfile=" + font + ":text='BEST PHONE RINGTONES':fontcolor=0x00E8FF:fontsize=23:x=(w-text_w)/2:y=920:shadowcolor=black@0.9:shadowx=1:shadowy=1,"
           "format=yuv420p")
-    cmd = [ffmpeg, "-y", "-i", str(src), "-t", str(a.duration), "-vf", vf, "-map", "0:v:0", "-map", "0:a?", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(out)]
+    audio = (ROOT / a.audio).resolve() if a.audio else None
+    if audio and not audio.is_file():
+        raise SystemExit(f"Audio file not found: {audio}")
+    cmd = [ffmpeg, "-y", "-i", str(src)]
+    if audio:
+        cmd += ["-ss", str(a.audio_start), "-i", str(audio)]
+    cmd += ["-t", str(a.duration), "-vf", vf, "-map", "0:v:0"]
+    if audio:
+        fade_out = max(a.duration - 1, 0)
+        af = f"afade=t=in:d=0.3,afade=t=out:st={fade_out}:d=1,loudnorm=I=-14:TP=-1.5:LRA=11"
+        # The template's own audio track is digital silence, so it is replaced, not mixed.
+        cmd += ["-map", "1:a:0", "-af", af]
+    else:
+        cmd += ["-map", "0:a?"]
+    cmd += ["-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+            "-shortest", "-movflags", "+faststart", str(out)]
     subprocess.run(cmd, check=True)
     print(f"Rendered supplied MP4 template with source audio preserved when present: {out}")
 
