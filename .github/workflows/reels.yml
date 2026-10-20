@@ -45,7 +45,7 @@ on:
     - cron: "17 12 * * *"
 
 permissions:
-  contents: read
+  contents: write   # needed to stage the MP4 on a temporary branch (public video_url for Instagram)
 
 concurrency:
   group: best-phone-ringtones-reel-builder
@@ -158,6 +158,33 @@ jobs:
             awk -v m="$MEAN" 'BEGIN{exit !(m > -60)}' || { echo "::error::Audio is silent"; exit 1; }
           fi
 
+      - name: Stage video at a public URL (temporary branch)
+        if: ${{ inputs.publish_now == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          NAME="reel-${GITHUB_RUN_ID}.mp4"
+          STAGE=$(mktemp -d)
+          cp output/best-phone-ringtones-reel.mp4 "$STAGE/$NAME"
+          cd "$STAGE"
+          git init -q -b reel-staging
+          git add "$NAME"
+          git -c user.name="github-actions" -c user.email="actions@users.noreply.github.com" commit -qm "stage reel $GITHUB_RUN_ID"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" reel-staging
+          URL="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/reel-staging/${NAME}"
+          for i in 1 2 3 4 5 6; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$URL" || true)
+            echo "Check $i: HTTP $CODE ($URL)"
+            [ "$CODE" = "200" ] && break
+            sleep 5
+          done
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Video URL is not publicly reachable (HTTP $CODE). The repository must be PUBLIC for Instagram to download it."
+            exit 1
+          fi
+          echo "VIDEO_URL=$URL" >> "$GITHUB_ENV"
+
       - name: Publish Reel
         if: ${{ inputs.publish_now == true }}
         env:
@@ -169,9 +196,16 @@ jobs:
           REEL_CAPTION: ${{ env.REEL_CAPTION }}
           IG_AUDIO_ID: ${{ env.IG_AUDIO_ID }}
           AUDIO_SOURCE: ${{ env.AUDIO_SOURCE }}
+          VIDEO_URL: ${{ env.VIDEO_URL }}
           VIDEO_PATH: output/best-phone-ringtones-reel.mp4
           INSTAGRAM_PUBLISH: "true"
         run: python src/instagram_publish.py
+
+      - name: Remove staging branch
+        if: ${{ always() && inputs.publish_now == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --delete reel-staging || true
 
       - name: Save Reel and caption as workflow artifacts
         if: ${{ inputs.publish_now != true }}
