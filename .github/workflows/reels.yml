@@ -127,7 +127,7 @@ jobs:
         run: |
           mkdir -p output
           AUDIO_ARGS=()
-          if [ "$AUDIO_SOURCE" = "file" ]; then AUDIO_ARGS=(--audio "$AUDIO_PATH" --audio-start "$AUDIO_START"); fi
+          if [ "$AUDIO_SOURCE" = "file" ]; then AUDIO_ARGS=(--audio "$AUDIO_PATH" --audio-start "$AUDIO_START"); else AUDIO_ARGS=(--no-audio); fi
           if [ -f assets/template-reel.mp4 ]; then
             python src/render_template_video.py \
               --input assets/template-reel.mp4 \
