@@ -10,6 +10,9 @@ Env out: AUDIO_PATH, SONG_TITLE, ARTIST_NAME (written to $GITHUB_ENV)
 import os, random, sys
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(__file__))
+import used_audio
+
 ROOT = Path(__file__).resolve().parents[1]
 AUDIO_DIR = ROOT / "assets" / "audio"
 EXTS = {".mp3", ".m4a", ".wav", ".aac", ".ogg", ".flac"}
@@ -25,7 +28,10 @@ else:
     files = sorted(p for p in AUDIO_DIR.glob("*") if p.suffix.lower() in EXTS)
     if not files:
         raise SystemExit("No audio found. Upload an .mp3 to assets/audio/ (e.g. 'Artist - Title.mp3').")
-    path = random.choice(files)
+    fresh = [p for p in files if not used_audio.is_used(audio_id="file:" + p.name)]
+    if not fresh:
+        raise SystemExit("All files in assets/audio were already posted. Add new MP3s to assets/audio/.")
+    path = random.choice(fresh)
 
 title = os.getenv("SONG_TITLE", "").strip()
 artist = os.getenv("ARTIST_NAME", "").strip()

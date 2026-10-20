@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Any
 import requests
 
+sys.path.insert(0, os.path.dirname(__file__))
+import used_audio
+
 GRAPH_BASE = "https://graph.facebook.com"
 API_VERSION = os.getenv("META_API_VERSION", "v26.0")
 TIMEOUT = 60
@@ -66,6 +69,21 @@ def create_container_from_url(user_id: str, token: str, video_url: str, caption:
         raise InstagramAPIError("Container creation response did not include an ID.")
     return str(container_id)
 
+def check_publish_quota(user_id: str, token: str) -> None:
+    """Stop before posting when Meta's rolling 24h API publishing limit is reached (non-fatal if unreadable)."""
+    try:
+        info = api_request("GET", f"{GRAPH_BASE}/{API_VERSION}/{user_id}/content_publishing_limit",
+                           params={"fields": "quota_usage,config", "access_token": token})
+    except InstagramAPIError as exc:
+        print(f"WARNING: could not read publishing quota ({str(exc)[:200]}); continuing.")
+        return
+    row = (info.get("data") or [{}])[0]
+    usage = row.get("quota_usage")
+    total = (row.get("config") or {}).get("quota_total") or 100
+    print(f"Publishing quota (rolling 24h): {usage}/{total}")
+    if isinstance(usage, int) and usage >= total:
+        raise InstagramAPIError(f"Instagram 24h publishing limit reached ({usage}/{total}); try again later.")
+
 def wait_until_ready(container_id: str, token: str, timeout_seconds: int = 300) -> None:
     url = f"{GRAPH_BASE}/{API_VERSION}/{container_id}"
     deadline = time.monotonic() + timeout_seconds
@@ -99,6 +117,7 @@ def main() -> int:
     if os.getenv("AUDIO_SOURCE", "instagram") != "file" and not audio_id:
         raise InstagramAPIError("No IG_AUDIO_ID selected; refusing to publish a silent Reel.")
     print(f"Publishing Reel: {title} — {artist} | audio: {'Instagram catalog id ' + audio_id if audio_id else 'baked into MP4'}")
+    check_publish_quota(user_id, token)
     video_url = os.getenv("VIDEO_URL", "").strip()
     if video_url:
         print(f"Using video_url upload: {video_url}")
@@ -129,6 +148,9 @@ def main() -> int:
         if not kind.startswith("MUSIC"):
             print(f"::error::Reel was published but Instagram did NOT report catalog music (audio_id {audio_id}).", file=sys.stderr)
             return 2
+    history_id = audio_id or ("file:" + Path(os.getenv("AUDIO_PATH", "")).name)
+    used_audio.record(history_id, title, artist, media_id)
+    print(f"Recorded in data/used_audio.json: {history_id}")
     return 0
 
 if __name__ == "__main__":
