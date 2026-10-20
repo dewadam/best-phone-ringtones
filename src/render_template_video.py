@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a vertical MP4 template with song metadata centered in the middle square-safe area."""
+"""Render a vertical MP4 template with compact song metadata inside the central square display."""
 import argparse, shutil, subprocess
 from pathlib import Path
 
@@ -25,15 +25,14 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     def esc(s):
         return s.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace("%", "\\%").replace(",", "\\,").replace("[", "\\[").replace("]", "\\]")
-    title = esc(a.title[:70]); artist = esc(a.artist[:70])
+    title = esc(a.title[:50]); artist = esc(a.artist[:50])
     font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    # For a 1080x1920 Reel, the centered 1080x1080 square spans y=420..1500.
-    # Keep the full metadata panel centered inside that square-safe region.
+    # No rectangle/panel: place compact text directly inside the template's central square screen.
+    # 1080x1920 canvas; the square display is approximately x=240..840, y=540..1110.
     vf = ("scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
-          "drawbox=x=55:y=790:w=970:h=350:color=black@0.72:t=fill,"
-          f"drawtext=fontfile={font}:text='{title}':fontcolor=white:fontsize=58:x=(w-text_w)/2:y=840,"
-          f"drawtext=fontfile={font}:text='{artist}':fontcolor=0xFF46CD:fontsize=42:x=(w-text_w)/2:y=940,"
-          "drawtext=fontfile=" + font + ":text='BEST PHONE RINGTONES':fontcolor=0x00E8FF:fontsize=26:x=(w-text_w)/2:y=1040,"
+          f"drawtext=fontfile={font}:text='{title}':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=790:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
+          f"drawtext=fontfile={font}:text='{artist}':fontcolor=0xFF46CD:fontsize=32:x=(w-text_w)/2:y=860:shadowcolor=black@0.9:shadowx=2:shadowy=2,"
+          "drawtext=fontfile=" + font + ":text='BEST PHONE RINGTONES':fontcolor=0x00E8FF:fontsize=19:x=(w-text_w)/2:y=920:shadowcolor=black@0.9:shadowx=1:shadowy=1,"
           "format=yuv420p")
     cmd = [ffmpeg, "-y", "-i", str(src), "-t", str(a.duration), "-vf", vf, "-an", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", str(out)]
     subprocess.run(cmd, check=True)
