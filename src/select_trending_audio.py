@@ -3,7 +3,7 @@
 import json, os, random, sys
 import requests
 
-version = os.getenv("META_API_VERSION", "v24.0")
+version = os.getenv("META_API_VERSION", "v26.0")
 token = os.getenv("IG_ACCESS_TOKEN", "").strip()
 user_id = os.getenv("IG_USER_ID", "").strip()
 if not token:
