@@ -34,7 +34,7 @@ def upload_resumable(user_id: str, token: str, video_path: Path, caption: str, a
     payload = {"media_type": "REELS", "upload_type": "resumable", "caption": caption, "share_to_feed": "true", "access_token": token}
     if audio_id:
         # Meta Audio API: audio is attached via the audio_configuration JSON object (not a bare audio_id field).
-        payload["audio_configuration"] = json.dumps({"audio_id": audio_id, "audio_volume": 100})
+        payload["audio_configuration"] = json.dumps({"audio_id": audio_id, "audio_volume": 100, "video_volume": 0})
     container = api_request("POST", create_url, data=payload)
     print("Container created:", json.dumps({k: v for k, v in container.items() if k != "access_token"}))
     print("audio_configuration sent:", payload.get("audio_configuration", "NONE"))
@@ -57,7 +57,7 @@ def create_container_from_url(user_id: str, token: str, video_url: str, caption:
     create_url = f"{GRAPH_BASE}/{API_VERSION}/{user_id}/media"
     payload = {"media_type": "REELS", "video_url": video_url, "caption": caption, "share_to_feed": "true", "access_token": token}
     if audio_id:
-        payload["audio_configuration"] = json.dumps({"audio_id": audio_id, "audio_volume": 100})
+        payload["audio_configuration"] = json.dumps({"audio_id": audio_id, "audio_volume": 100, "video_volume": 0})
     container = api_request("POST", create_url, data=payload)
     print("Container created (video_url):", json.dumps(container))
     print("audio_configuration sent:", payload.get("audio_configuration", "NONE"))
