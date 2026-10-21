@@ -13,6 +13,15 @@ on:
         required: true
         default: "RANDOM"
         type: string
+      category:
+        description: "Song category for the instagram catalog: any / turkish / foreign (scheduled runs set it automatically)"
+        required: true
+        default: "any"
+        type: choice
+        options:
+          - any
+          - turkish
+          - foreign
       audio_source:
         description: "instagram = attach song from Instagram catalog via API; file = mix your own MP3 from assets/audio into the video"
         required: true
@@ -42,9 +51,9 @@ on:
         default: "0"
         type: string
       duration:
-        description: "Reel duration in seconds (3-90)"
+        description: "Reel duration in seconds (3-29, hard maximum 29)"
         required: true
-        default: "30"
+        default: "29"
         type: string
       publish_now:
         description: "Publish to Instagram (requires configured repository secrets)"
@@ -52,8 +61,9 @@ on:
         default: false
         type: boolean
   schedule:
-    # 15 runs per day: every hour at minute 07, 05:00-19:00 UTC (= 08:07-22:07 Istanbul time)
-    - cron: "7 5-19 * * *"
+    # 30 runs per day = 15 Turkish + 15 foreign songs, 08:07-22:37 Istanbul time (05:00-19:59 UTC)
+    - cron: "7 5-19 * * *"    # :07 -> Turkish song
+    - cron: "37 5-19 * * *"   # :37 -> foreign song
 
 permissions:
   contents: write   # needed to stage the MP4 on a temporary branch (public video_url for Instagram)
@@ -91,6 +101,8 @@ jobs:
           INPUT_ARTIST: ${{ inputs.artist_name }}
           INPUT_DURATION: ${{ inputs.duration }}
           INPUT_AUDIO_SOURCE: ${{ inputs.audio_source }}
+          INPUT_CATEGORY: ${{ inputs.category }}
+          SCHEDULE_CRON: ${{ github.event.schedule }}
           INPUT_AUDIO_FILE: ${{ inputs.audio_file }}
           INPUT_AUDIO_START: ${{ inputs.audio_start }}
           INPUT_PUBLISH_NOW: ${{ inputs.publish_now }}
@@ -104,13 +116,22 @@ jobs:
           else
             PUBLISH="$INPUT_PUBLISH_NOW"
           fi
+          # Which category? Scheduled runs: the cron entry decides (minute 07 = Turkish, minute 37 = foreign).
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            case "$SCHEDULE_CRON" in
+              "7 5-19 * * *") CATEGORY=turkish ;;
+              *)              CATEGORY=foreign ;;
+            esac
+          else
+            CATEGORY="${INPUT_CATEGORY:-any}"
+          fi
           TITLE="${INPUT_TITLE:-RANDOM}"
           ARTIST="${INPUT_ARTIST:-RANDOM}"
           if [ "$TITLE" = "RANDOM" ]; then TITLE=""; fi
           if [ "$ARTIST" = "RANDOM" ]; then ARTIST=""; fi
-          DURATION="${INPUT_DURATION:-30}"
-          if ! [[ "$DURATION" =~ ^[0-9]+$ ]] || [ "$DURATION" -lt 3 ] || [ "$DURATION" -gt 90 ]; then
-            echo "::error::Duration must be an integer between 3 and 90 seconds."
+          DURATION="${INPUT_DURATION:-29}"
+          if ! [[ "$DURATION" =~ ^[0-9]+$ ]] || [ "$DURATION" -lt 3 ] || [ "$DURATION" -gt 29 ]; then
+            echo "::error::Duration must be an integer between 3 and 29 seconds (Reels are capped at 29 s)."
             exit 1
           fi
           {
@@ -121,6 +142,7 @@ jobs:
             echo "AUDIO_FILE=$INPUT_AUDIO_FILE"
             echo "AUDIO_START=${INPUT_AUDIO_START:-0}"
             echo "PUBLISH_NOW=$PUBLISH"
+            echo "CATEGORY=$CATEGORY"
           } >> "$GITHUB_ENV"
 
       - name: Select Instagram catalog audio
@@ -181,6 +203,9 @@ jobs:
             -of default=noprint_wrappers=1 output/best-phone-ringtones-reel.mp4
           ffprobe -v error -show_entries format=duration \
             -of default=noprint_wrappers=1 output/best-phone-ringtones-reel.mp4
+          LEN=$(ffprobe -v error -show_entries format=duration -of csv=p=0 output/best-phone-ringtones-reel.mp4)
+          echo "Reel length: ${LEN}s (max 29s)"
+          awk -v d="$LEN" 'BEGIN{exit !(d <= 29.05)}' || { echo "::error::Reel is longer than 29 seconds ($LEN s)"; exit 1; }
           if [ "$AUDIO_SOURCE" = "file" ]; then
             # Fail the run if the Reel has no audible sound
             test -n "$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 output/best-phone-ringtones-reel.mp4)" \
