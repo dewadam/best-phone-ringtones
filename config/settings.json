@@ -4,7 +4,7 @@
     "width": 1080,
     "height": 1920,
     "fps": 30,
-    "default_duration_seconds": 15
+    "default_duration_seconds": 29
   },
   "publishing": {
     "enabled": false,

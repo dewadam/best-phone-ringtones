@@ -1,0 +1,118 @@
+# Turkish artists used to FIND and RECOGNISE Turkish songs (one per line, '#' = comment).
+# Add the artists you want more of; remove ones you don't want. Names shorter than 4 letters are ignored.
+Manifest
+Bora Duran
+Tarkan
+Sezen Aksu
+Sertab Erener
+Hadise
+Murat Boz
+Kenan Doğulu
+Mabel Matiz
+Gökhan Türkmen
+Edis
+Simge
+Aleyna Tilki
+Zeynep Bastık
+Irmak Arıcı
+Gülşen
+Demet Akalın
+Hande Yener
+Ajda Pekkan
+Ebru Gündeş
+Işın Karaca
+Yıldız Tilbe
+Sıla
+Hakan Peker
+Mustafa Sandal
+Emre Aydın
+Duman
+Yüksek Sadakat
+Model
+maNga
+Mor ve Ötesi
+Teoman
+Sagopa Kajmer
+Ceza
+Ezhel
+Norm Ender
+Gazapizm
+Reynmen
+Motive
+Lvbel C5
+Heijan
+Contra
+Murda
+Blok3
+Khontkar
+Anıl Piyancı
+Şehinşah
+Uzi
+Sefo
+Güneş
+Burak Bulut
+Bengü
+Berkay
+Mustafa Ceceli
+Gökhan Özen
+Ahmet Kaya
+İbrahim Tatlıses
+Müslüm Gürses
+Orhan Gencebay
+Ferdi Tayfur
+Cem Karaca
+Barış Manço
+Zeki Müren
+Neşet Ertaş
+Tuğba Yurt
+Mahsun Kırmızıgül
+Kıraç
+Bilal Sonses
+Serdar Ortaç
+Ziynet Sali
+Funda Arar
+Nilüfer
+Cem Adrian
+Gripin
+Pinhani
+Büyük Ev Ablukada
+Madrigal
+Athena
+Haluk Levent
+Koray Avcı
+Kolpa
+Semicenk
+Mert Demir
+Oğuzhan Koç
+Tuğçe Haşimoğlu
+Ece Seçkin
+Sena Şener
+Rafet El Roman
+Yalın
+Burcu Güneş
+Melek Mosso
+Tuna Kiremitçi
+Ahmet Şafak
+Fatma Turgut
+Pamela
+Selda Bağcan
+Gökhan Tepe
+Ebru Yaşar
+Kurtuluş Kuş
+Kubat
+Yusuf Güney
+Nazan Öncel
+Candan Erçetin
+Sıla Gençoğlu
+Emrah
+Azer Bülbül
+Hayko Cepkin
+Dedubluman
+Gamze
+Ceylan Ertem
+Allame
+Ben Fero
+Esat Kabaklı
+Lil Zey
+Muti
+Eypio

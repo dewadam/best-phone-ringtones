@@ -33,6 +33,14 @@ The template MP4's own audio track is digital silence, so the video is silent un
 
 **How instagram mode uploads:** Meta documents `audio_configuration` only with `video_url`, so on publish the MP4 is pushed to a temporary `reel-staging` branch and Instagram downloads it from `raw.githubusercontent.com` (the repository must be **public**; the branch is deleted after the run). The resumable upload is only a fallback and does not attach catalog music.
 
+## Schedule: 30 Reels per day (15 Turkish + 15 foreign)
+
+- `7 5-19 * * *` runs every hour at :07 and posts a **Turkish** song; `37 5-19 * * *` runs at :37 and posts a **foreign** song (05:00-19:59 UTC = 08:07-22:37 Istanbul).
+- Meta's Audio API has no country filter, so Turkish songs are recognised by the artists in `data/turkish_artists.txt` (edit it freely) or by Turkish-only letters (ş ğ ı İ) in the title/artist.
+- Songs already posted are never picked again (`data/used_audio.json`); tracks shorter than 29 s are skipped.
+- Reels are hard-capped at **29 seconds** (render + a check that fails the run if the file is longer).
+- Pause everything without editing code: repository variable `AUTO_PUBLISH` = `false`.
+
 ## Configure Instagram API publishing
 
 The publishing step is deliberately opt-in. Before using it:

@@ -5,12 +5,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+MAX_SECONDS = 29  # Reels from this project must never be longer than 29 s
+FPS = 30
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--input", default="assets/template-reel.mp4")
     p.add_argument("--title", required=True)
     p.add_argument("--artist", required=True)
-    p.add_argument("--duration", type=int, default=30)
+    p.add_argument("--duration", type=int, default=29)
     p.add_argument("--output", required=True)
     p.add_argument("--audio", default="", help="Audio file to use as the Reel soundtrack (replaces the template's silent track).")
     p.add_argument("--no-audio", action="store_true", help="Drop the template's (silent) audio track entirely; used when Instagram attaches catalog music.")
@@ -20,8 +24,8 @@ def main():
     out = (ROOT / a.output).resolve()
     if not src.is_file():
         raise SystemExit(f"Template MP4 not found: {src}. Add your uploaded video as assets/template-reel.mp4 in the repository.")
-    if not 3 <= a.duration <= 90:
-        raise SystemExit("Duration must be between 3 and 90 seconds.")
+    if not 3 <= a.duration <= MAX_SECONDS:
+        raise SystemExit("Duration must be between 3 and 29 seconds (Reels are capped at 29 s).")
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise SystemExit("FFmpeg was not found on PATH.")
@@ -47,7 +51,7 @@ def main():
     cmd = [ffmpeg, "-y", "-i", str(src)]
     if audio:
         cmd += ["-ss", str(a.audio_start), "-i", str(audio)]
-    cmd += ["-t", str(a.duration), "-vf", vf, "-map", "0:v:0"]
+    cmd += ["-t", str(a.duration), "-frames:v", str(a.duration * FPS), "-vf", vf, "-map", "0:v:0"]
     if audio:
         fade_out = max(a.duration - 1, 0)
         af = f"afade=t=in:d=0.3,afade=t=out:st={fade_out}:d=1,loudnorm=I=-14:TP=-1.5:LRA=11"
@@ -57,7 +61,7 @@ def main():
         cmd += ["-an"]
     else:
         cmd += ["-map", "0:a?"]
-    cmd += ["-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+    cmd += ["-r", str(FPS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
             "-shortest", "-movflags", "+faststart", str(out)]
     subprocess.run(cmd, check=True)

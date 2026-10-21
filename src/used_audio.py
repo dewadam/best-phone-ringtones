@@ -8,8 +8,16 @@ ROOT = Path(__file__).resolve().parents[1]
 FILE = ROOT / "data" / "used_audio.json"
 
 
-def _norm(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+_TR = str.maketrans({"ı": "i", "İ": "i", "ş": "s", "Ş": "s", "ğ": "g", "Ğ": "g", "ç": "c", "Ç": "c",
+                     "ö": "o", "Ö": "o", "ü": "u", "Ü": "u"})
+
+
+def norm(value: str) -> str:
+    """Lower-case ASCII key: Turkish letters are transliterated first (Aşk != Ak)."""
+    return re.sub(r"[^a-z0-9]+", "", (value or "").translate(_TR).lower())
+
+
+_norm = norm
 
 
 def load() -> list[dict]:

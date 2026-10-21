@@ -113,7 +113,7 @@ def main() -> int:
     template = Path(args.template).expanduser().resolve()
     if not template.exists():
         template = None
-    if not 3 <= args.duration <= 90:
+    if not 3 <= args.duration <= 29:
         raise SystemExit("Duration must be between 3 and 90 seconds.")
 
     output = (ROOT / args.output).resolve()
